@@ -2,7 +2,7 @@
 
 /* =========================================
    I FIND AI — MAIN JAVASCRIPT
-   Version: 2.1
+   Version: 2.2
    ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -59,7 +59,7 @@ function initWelcomeScreen() {
 }
 
 /* =========================================
-   2. MOBILE NAVIGATION — FIXED
+   2. MOBILE NAVIGATION
    ========================================= */
 
 function initMobileNavigation() {
@@ -85,11 +85,9 @@ function initMobileNavigation() {
   button.addEventListener("click", (event) => {
     event.stopPropagation();
 
-    if (nav.classList.contains("is-open")) {
-      closeMenu();
-    } else {
-      openMenu();
-    }
+    nav.classList.contains("is-open")
+      ? closeMenu()
+      : openMenu();
   });
 
   nav.querySelectorAll("a").forEach((link) => {
@@ -97,24 +95,17 @@ function initMobileNavigation() {
   });
 
   document.addEventListener("click", (event) => {
-    if (
-      !nav.contains(event.target) &&
-      !button.contains(event.target)
-    ) {
+    if (!nav.contains(event.target) && !button.contains(event.target)) {
       closeMenu();
     }
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      closeMenu();
-    }
+    if (event.key === "Escape") closeMenu();
   });
 
   window.addEventListener("resize", () => {
-    if (window.innerWidth > 680) {
-      closeMenu();
-    }
+    if (window.innerWidth > 680) closeMenu();
   });
 }
 
@@ -247,7 +238,7 @@ function releaseURL(type) {
 }
 
 /* =========================================
-   6. IMAGE UPLOAD
+   6. IMAGE UPLOAD — ENGINE CONNECTED
    ========================================= */
 
 function initImageUpload() {
@@ -256,10 +247,9 @@ function initImageUpload() {
   const image = document.getElementById("image-preview-img");
   const name = document.getElementById("image-file-name");
   const remove = document.getElementById("remove-image");
+  const analyze = document.getElementById("analyze-image");
 
   if (!input) return;
-
-  const analyze = document.getElementById("analyze-image");
 
   function clearImage() {
     selectedImage = null;
@@ -269,9 +259,16 @@ function initImageUpload() {
     if (image) image.removeAttribute("src");
     if (preview) preview.hidden = true;
     if (name) name.textContent = "";
+
     if (analyze) analyze.disabled = true;
 
     hideStatus();
+
+    const results = document.getElementById("results-section");
+    const content = document.getElementById("results-content");
+
+    if (results) results.hidden = true;
+    if (content) content.replaceChildren();
   }
 
   function handleImage(file) {
@@ -292,6 +289,16 @@ function initImageUpload() {
     releaseURL("image");
 
     selectedImage = file;
+
+    // Keep input.files synchronized for image-engine.js.
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+    } catch (error) {
+      // Normal file-picker selection remains available.
+    }
+
     imageURL = URL.createObjectURL(file);
 
     if (image) {
@@ -305,9 +312,16 @@ function initImageUpload() {
       name.textContent = `${file.name} · ${formatFileSize(file.size)}`;
     }
 
-    if (analyze) analyze.disabled = true;
+    // Enable image analysis after valid selection.
+    if (analyze) analyze.disabled = false;
 
     hideStatus();
+
+    const results = document.getElementById("results-section");
+    const content = document.getElementById("results-content");
+
+    if (results) results.hidden = true;
+    if (content) content.replaceChildren();
   }
 
   input.addEventListener("change", () => {
@@ -331,10 +345,9 @@ function initVideoUpload() {
   const video = document.getElementById("video-preview-player");
   const name = document.getElementById("video-file-name");
   const remove = document.getElementById("remove-video");
+  const analyze = document.getElementById("analyze-video");
 
   if (!input) return;
-
-  const analyze = document.getElementById("analyze-video");
 
   function clearVideo() {
     selectedVideo = null;
@@ -480,21 +493,30 @@ function initWritingDetector() {
    ========================================= */
 
 function initAnalysisButtons() {
-  [
-    "analyze-image",
-    "analyze-video",
-    "analyze-writing"
-  ].forEach((id) => {
-    const button = document.getElementById(id);
+  const imageButton = document.getElementById("analyze-image");
+  const videoButton = document.getElementById("analyze-video");
+  const writingButton = document.getElementById("analyze-writing");
 
-    if (!button) return;
+  // Image button is controlled by image upload selection.
+  // image-engine.js handles its click event.
+  if (imageButton) {
+    imageButton.disabled = !selectedImage;
+    imageButton.removeAttribute("aria-disabled");
+    imageButton.title = "Analyze the selected image on your device.";
+  }
 
-    // Prevent fabricated AI detection results.
-    // Real detection engines are not integrated yet.
-    button.disabled = true;
-    button.setAttribute("aria-disabled", "true");
-    button.title = "Detection engine is not integrated yet.";
-  });
+  // These engines are not integrated yet.
+  if (videoButton) {
+    videoButton.disabled = true;
+    videoButton.setAttribute("aria-disabled", "true");
+    videoButton.title = "Video detection engine is not integrated yet.";
+  }
+
+  if (writingButton) {
+    writingButton.disabled = true;
+    writingButton.setAttribute("aria-disabled", "true");
+    writingButton.title = "Writing detection engine is not integrated yet.";
+  }
 }
 
 /* =========================================
@@ -502,14 +524,13 @@ function initAnalysisButtons() {
    ========================================= */
 
 function initFooterYear() {
+  const currentYear = String(new Date().getFullYear());
   const year = document.getElementById("current-year");
 
-  if (year) {
-    year.textContent = String(new Date().getFullYear());
-  }
+  if (year) year.textContent = currentYear;
 
   document.querySelectorAll("[data-current-year]").forEach((element) => {
-    element.textContent = String(new Date().getFullYear());
+    element.textContent = currentYear;
   });
 }
 
