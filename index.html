@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>I Find AI — Discover What's Real</title>
+  <meta name="description" content="Explore AI image, video, deepfake and AI writing detection with I Find AI. Privacy-first content analysis.">
+  <meta name="keywords" content="AI detector, AI image detector, AI video detector, deepfake detector, AI writing detector, content verification">
+  <meta name="author" content="I Find AI">
+  <meta name="theme-color" content="#080b18">
+  <meta name="color-scheme" content="dark">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="I Find AI — Discover What's Real">
+  <meta property="og:description" content="Explore AI content detection and digital authenticity analysis.">
+
+  <link rel="icon" href="assets/favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+
+  <script src="script.js" defer></script>
+</head>
+
+<body>
+
+  <!-- WELCOME EXPERIENCE -->
+  <div id="welcome-screen" class="welcome-screen"
+       role="dialog" aria-label="Welcome to I Find AI">
+
+    <div class="welcome-glow"></div>
+
+    <div class="welcome-content">
+
+      <div class="welcome-character">
+        <img
+          src="assets/ifindai-mascot.webp"
+          alt="I Find AI welcome character waving hello"
+          id="welcome-mascot"
+        >
+      </div>
+
+      <p class="welcome-greeting" id="welcome-greeting">
+        Hii! 👋
+      </p>
+
+      <h1 class="welcome-brand">
+        Welcome to <span>I FIND AI</span>
+      </h1>
+
+      <p class="welcome-message">
+        Have a good day! ✨
+      </p>
+
+    </div>
+
+    <div class="welcome-progress">
+      <span></span>
+    </div>
+
+  </div>
+
+
+  <!-- MAIN WEBSITE -->
+  <div id="main-website">
+
+    <!-- HEADER -->
+    <header class="site-header">
+
+      <a href="#home" class="brand-logo" aria-label="I Find AI Home">
+        <span class="brand-symbol">I</span>
+        <span>I FIND <strong>AI</strong></span>
+      </a>
+
+      <nav class="main-navigation" aria-label="Main navigation">
+        <a href="#home">Home</a>
+        <a href="#detector">AI Detector</a>
+        <a href="#features">Features</a>
+        <a href="#about">About</a>
+      </nav>
+
+      <button class="mobile-menu-button"
+              id="mobile-menu-button"
+              aria-label="Open navigation"
+              aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+    </header>
+
+
+    <!-- HERO SECTION -->
+    <main>
+
+      <section class="hero-section" id="home">
+
+        <div class="hero-background"></div>
+
+        <div class="hero-content">
+
+          <div class="hero-label">
+            <span class="status-dot"></span>
+            YOUR DIGITAL AUTHENTICITY COMPANION
+          </div>
+
+          <h1>
+            Discover the
+            <span>Truth Behind</span>
+            Every Creation.
+          </h1>
+
+          <p>
+            Curious whether something was created by AI?
+            Explore images, videos and writing with
+            intelligent content analysis.
+          </p>
+
+          <div class="hero-actions">
+            <a href="#detector" class="primary-button">
+              Start Exploring
+              <span>↗</span>
+            </a>
+
+            <a href="#features" class="secondary-button">
+              Explore Features
+            </a>
+          </div>
+
+          <div class="hero-trust">
+            <span>✦ Privacy-first approach</span>
+            <span>✦ No permanent file storage</span>
+          </div>
+
+        </div>
+
+        <div class="hero-visual">
+
+          <div class="mascot-orbit">
+
+            <div class="orbit-ring orbit-one"></div>
+            <div class="orbit-ring orbit-two"></div>
+
+            <div class="mascot-frame" id="mascot-frame">
+              <img
+                src="assets/ifindai-mascot.webp"
+                alt="I Find AI mascot holding a magnifying glass"
+                class="hero-mascot"
+              >
+            </div>
+
+            <div class="floating-element floating-image">
+              <span>▧</span>
+              IMAGE
+            </div>
+
+            <div class="floating-element floating-video">
+              <span>▶</span>
+              VIDEO
+            </div>
+
+            <div class="floating-element floating-text">
+              <span>✎</span>
+              TEXT
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- ADVERTISEMENT AREA -->
+      <section class="ad-section" aria-label="Advertisement">
+        <div class="ad-placeholder">
+          <span>ADVERTISEMENT</span>
+        </div>
+      </section>
+
+
+      <!-- DETECTION STUDIO -->
+      <section class="detector-section" id="detector">
+
+        <div class="section-heading">
+          <span class="section-eyebrow">THE DETECTION STUDIO</span>
+
+          <h2>
+            What would you like
+            <span>to verify?</span>
+          </h2>
+
+          <p>
+            Choose your content type to begin an analysis.
+          </p>
+        </div>
+
+
+        <!-- DETECTION MODE SELECTOR -->
+        <div class="detector-tabs"
+             role="tablist"
+             aria-label="Detection type">
+
+          <button class="detector-tab active"
+                  id="tab-image"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="panel-image"
+                  data-mode="image">
+            <span>▧</span>
+            Image
+          </button>
+
+          <button class="detector-tab"
+                  id="tab-video"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="panel-video"
+                  data-mode="video">
+            <span>▶</span>
+            Video
+          </button>
+
+          <button class="detector-tab"
+                  id="tab-text"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="panel-text"
+                  data-mode="text">
+            <span>✎</span>
+            Writing
+          </button>
+
+        </div>
+
+
+        <!-- IMAGE PANEL -->
+        <div class="detector-panel active"
+             id="panel-image"
+             role="tabpanel"
+             aria-labelledby="tab-image">
+
+          <div class="upload-area" id="image-upload-area">
+
+            <div class="upload-icon">▧</div>
+
+            <h3>Upload an Image</h3>
+
+            <p>
+              Drag and drop your image here,
+              or choose a file from your device.
+            </p>
+
+            <label for="image-file" class="upload-button">
+              Choose Image
+            </label>
+
+            <input
+              type="file"
+              id="image-file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              hidden
+            >
+
+            <p class="upload-hint">
+              JPG, PNG, WEBP or GIF
+            </p>
+
+          </div>
+
+          <div class="file-preview" id="image-preview" hidden>
+            <img id="image-preview-img" alt="Selected image preview">
+            <p id="image-file-name"></p>
+            <button type="button" id="remove-image">Remove Image</button>
+          </div>
+
+          <button class="analyze-button" id="analyze-image" disabled>
+            Analyze Image
+            <span>→</span>
+          </button>
+
+        </div>
+
+
+        <!-- VIDEO PANEL -->
+        <div class="detector-panel"
+             id="panel-video"
+             role="tabpanel"
+             aria-labelledby="tab-video"
+             hidden>
+
+          <div class="upload-area" id="video-upload-area">
+
+            <div class="upload-icon">▶</div>
+
+            <h3>Upload a Video</h3>
+
+            <p>
+              Select a video to inspect its frames
+              and authenticity indicators.
+            </p>
+
+            <label for="video-file" class="upload-button">
+              Choose Video
+            </label>
+
+            <input
+              type="file"
+              id="video-file"
+              accept="video/mp4,video/webm,video/quicktime"
+              hidden
+            >
+
+            <p class="upload-hint">
+              MP4, WEBM or MOV
+            </p>
+
+          </div>
+
+          <div class="file-preview" id="video-preview" hidden>
+            <video id="video-preview-player" controls></video>
+            <p id="video-file-name"></p>
+            <button type="button" id="remove-video">Remove Video</button>
+          </div>
+
+          <button class="analyze-button" id="analyze-video" disabled>
+            Analyze Video
+            <span>→</span>
+          </button>
+
+        </div>
+
+
+        <!-- TEXT PANEL -->
+        <div class="detector-panel"
+             id="panel-text"
+             role="tabpanel"
+             aria-labelledby="tab-text"
+             hidden>
+
+          <div class="writing-area">
+
+            <label for="writing-input">
+              Paste your text for analysis
+            </label>
+
+            <textarea
+              id="writing-input"
+              maxlength="10000"
+              rows="10"
+              placeholder="Paste your text here..."
+            ></textarea>
+
+            <div class="writing-footer">
+              <span id="character-count">0 / 10,000</span>
+              <button type="button" id="clear-writing">
+                Clear text
+              </button>
+            </div>
+
+          </div>
+
+          <button class="analyze-button"
+                  id="analyze-writing"
+                  disabled>
+            Analyze Writing
+            <span>→</span>
+          </button>
+
+        </div>
+
+
+        <!-- ANALYSIS STATUS -->
+        <div class="analysis-status"
+             id="analysis-status"
+             role="status"
+             aria-live="polite"
+             hidden>
+
+          <div class="analysis-spinner"></div>
+          <p id="analysis-message">Preparing analysis...</p>
+
+        </div>
+
+
+        <!-- RESULTS -->
+        <section class="results-section"
+                 id="results-section"
+                 aria-live="polite"
+                 hidden>
+
+          <div class="section-heading">
+            <span class="section-eyebrow">ANALYSIS REPORT</span>
+            <h2>Your Analysis Results</h2>
+          </div>
+
+          <div id="results-content"></div>
+
+        </section>
+
+      </section>
+
+
+      <!-- MIDDLE ADVERTISEMENT -->
+      <section class="ad-section" aria-label="Advertisement">
+        <div class="ad-placeholder">
+          <span>ADVERTISEMENT</span>
+        </div>
+      </section>
+
+
+      <!-- FEATURES -->
+      <section class="features-section" id="features">
+
+        <div class="section-heading">
+          <span class="section-eyebrow">EXPLORE THE PLATFORM</span>
+
+          <h2>
+            One platform.
+            <span>Multiple possibilities.</span>
+          </h2>
+
+          <p>
+            Tools designed to help you understand
+            digital content and its origins.
+          </p>
+        </div>
+
+        <div class="features-grid">
+
+          <article class="feature-card">
+            <span class="feature-icon">▧</span>
+            <h3>AI Image Analysis</h3>
+            <p>
+              Explore image metadata, provenance
+              and visual authenticity indicators.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon">▶</span>
+            <h3>AI Video Analysis</h3>
+            <p>
+              Examine video frames and
+              possible manipulation indicators.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon">✎</span>
+            <h3>AI Writing Analysis</h3>
+            <p>
+              Examine linguistic patterns and
+              possible AI-writing indicators.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon">◈</span>
+            <h3>Deepfake Analysis</h3>
+            <p>
+              Explore visual and audio-video
+              inconsistencies where supported.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon">◇</span>
+            <h3>Content Credentials</h3>
+            <p>
+              Check supported digital provenance
+              and authenticity information.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon">⌁</span>
+            <h3>Privacy First</h3>
+            <p>
+              Designed for local processing
+              without permanent file storage.
+            </p>
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- PRIVACY SECTION -->
+      <section class="privacy-section" id="about">
+
+        <div class="privacy-content">
+          <span class="section-eyebrow">YOUR PRIVACY MATTERS</span>
+
+          <h2>
+            Your content.
+            <span>Your control.</span>
+          </h2>
+
+          <p>
+            I FIND AI is designed around privacy-first
+            content analysis. Our goal is to process
+            content locally wherever technically possible,
+            without permanently storing your files.
+          </p>
+
+        </div>
+
+        <div class="privacy-symbol">◈</div>
+
+      </section>
+
+
+      <!-- BOTTOM ADVERTISEMENT -->
+      <section class="ad-section" aria-label="Advertisement">
+        <div class="ad-placeholder">
+          <span>ADVERTISEMENT</span>
+        </div>
+      </section>
+
+    </main>
+
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+
+      <div class="footer-brand">
+        <h2>I FIND <strong>AI</strong></h2>
+        <p>Find the Truth Behind AI.</p>
+      </div>
+
+      <div class="footer-links">
+        <a href="#home">Home</a>
+        <a href="#detector">Detector</a>
+        <a href="#features">Features</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms & Conditions</a>
+      </div>
+
+      <p class="footer-disclaimer">
+        AI detection results are indicators, not absolute proof.
+        Results may contain errors and should be interpreted carefully.
+      </p>
+
+      <p class="copyright">
+        © <span id="current-year">2026</span> I FIND AI. All rights reserved.
+      </p>
+
+    </footer>
+
+  </div>
+
+</body>
+</html>
