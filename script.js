@@ -2,7 +2,7 @@
 
 /* =========================================
    I FIND AI — MAIN JAVASCRIPT
-   Version: 2.0
+   Version: 2.1
    ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -59,26 +59,37 @@ function initWelcomeScreen() {
 }
 
 /* =========================================
-   2. MOBILE NAVIGATION
+   2. MOBILE NAVIGATION — FIXED
    ========================================= */
 
 function initMobileNavigation() {
   const button = document.getElementById("mobile-menu-button");
-  const nav = document.querySelector(".main-nav");
+  const nav = document.querySelector(".main-navigation");
 
   if (!button || !nav) return;
+
+  function openMenu() {
+    nav.classList.add("is-open");
+    button.classList.add("is-active");
+    button.setAttribute("aria-expanded", "true");
+    button.setAttribute("aria-label", "Close navigation");
+  }
 
   function closeMenu() {
     nav.classList.remove("is-open");
     button.classList.remove("is-active");
     button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-label", "Open navigation");
   }
 
-  button.addEventListener("click", () => {
-    const open = nav.classList.toggle("is-open");
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
 
-    button.classList.toggle("is-active", open);
-    button.setAttribute("aria-expanded", String(open));
+    if (nav.classList.contains("is-open")) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
   });
 
   nav.querySelectorAll("a").forEach((link) => {
@@ -86,13 +97,24 @@ function initMobileNavigation() {
   });
 
   document.addEventListener("click", (event) => {
-    if (!nav.contains(event.target) && !button.contains(event.target)) {
+    if (
+      !nav.contains(event.target) &&
+      !button.contains(event.target)
+    ) {
       closeMenu();
     }
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeMenu();
+    if (event.key === "Escape") {
+      closeMenu();
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 680) {
+      closeMenu();
+    }
   });
 }
 
@@ -107,6 +129,8 @@ function initDetectorTabs() {
   if (!tabs.length || !panels.length) return;
 
   function activateTab(selected) {
+    if (!selected) return;
+
     const mode = selected.dataset.mode;
 
     tabs.forEach((tab) => {
@@ -290,7 +314,9 @@ function initImageUpload() {
     handleImage(input.files?.[0]);
   });
 
-  if (remove) remove.addEventListener("click", clearImage);
+  if (remove) {
+    remove.addEventListener("click", clearImage);
+  }
 
   setupDropZone(input, handleImage);
 }
@@ -369,7 +395,9 @@ function initVideoUpload() {
     handleVideo(input.files?.[0]);
   });
 
-  if (remove) remove.addEventListener("click", clearVideo);
+  if (remove) {
+    remove.addEventListener("click", clearVideo);
+  }
 
   setupDropZone(input, handleVideo);
 }
@@ -391,18 +419,18 @@ function setupDropZone(input, onSelect) {
 
   zone.addEventListener("dragover", (event) => {
     event.preventDefault();
-    zone.classList.add("is-dragging");
+    zone.classList.add("drag-over");
   });
 
   zone.addEventListener("dragleave", (event) => {
     if (!zone.contains(event.relatedTarget)) {
-      zone.classList.remove("is-dragging");
+      zone.classList.remove("drag-over");
     }
   });
 
   zone.addEventListener("drop", (event) => {
     event.preventDefault();
-    zone.classList.remove("is-dragging");
+    zone.classList.remove("drag-over");
 
     const file = event.dataTransfer?.files?.[0];
 
@@ -462,6 +490,7 @@ function initAnalysisButtons() {
     if (!button) return;
 
     // Prevent fabricated AI detection results.
+    // Real detection engines are not integrated yet.
     button.disabled = true;
     button.setAttribute("aria-disabled", "true");
     button.title = "Detection engine is not integrated yet.";
@@ -473,6 +502,12 @@ function initAnalysisButtons() {
    ========================================= */
 
 function initFooterYear() {
+  const year = document.getElementById("current-year");
+
+  if (year) {
+    year.textContent = String(new Date().getFullYear());
+  }
+
   document.querySelectorAll("[data-current-year]").forEach((element) => {
     element.textContent = String(new Date().getFullYear());
   });
@@ -485,7 +520,7 @@ function initFooterYear() {
 function initAccessibility() {
   const menu = document.getElementById("mobile-menu-button");
 
-  if (menu && !menu.hasAttribute("aria-expanded")) {
+  if (menu) {
     menu.setAttribute("aria-expanded", "false");
   }
 
@@ -511,7 +546,6 @@ function registerServiceWorker() {
     return;
   }
 
-  // GitHub Pages project path.
   const serviceWorkerPath = "/I-find-ai/sw.js";
 
   window.addEventListener("load", async () => {
