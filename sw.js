@@ -2,16 +2,17 @@
 
 /* =========================================
    I FIND AI — SERVICE WORKER
-   Updated version: v2
+   Updated version: v3
    ========================================= */
 
-const CACHE_VERSION = "ifindai-cache-v2";
+const CACHE_VERSION = "ifindai-cache-v3";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./script.js",
+  "./image-engine.js",
   "./manifest.json",
   "./offline.html",
   "./privacy.html",
@@ -40,7 +41,7 @@ self.addEventListener("install", (event) => {
               await cache.put(url, response);
             }
           } catch (error) {
-            // Missing resources can be cached after a later visit.
+            console.warn("Could not cache:", url, error);
           }
         })
       );
@@ -73,13 +74,14 @@ self.addEventListener("activate", (event) => {
       );
 
       await self.clients.claim();
+
+      console.info("I FIND AI Service Worker v3 activated.");
     })()
   );
 });
 
 /* =========================================
-   3. NAVIGATION REQUESTS
-   Network first, offline page fallback.
+   3. FETCH HANDLER
    ========================================= */
 
 self.addEventListener("fetch", (event) => {
@@ -89,9 +91,10 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(request.url);
 
-  // Never intercept external resources.
+  // Do not intercept external resources.
   if (requestUrl.origin !== self.location.origin) return;
 
+  // Navigation: network first.
   if (request.mode === "navigate") {
     event.respondWith(
       (async () => {
@@ -124,11 +127,50 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  /* =======================================
-     4. STATIC RESOURCES
-     Cache first, network fallback.
-     ======================================= */
+  // HTML, CSS and JavaScript: network first.
+  // This helps load updated code after GitHub commits.
+  const isAppCode =
+    requestUrl.pathname.endsWith(".js") ||
+    requestUrl.pathname.endsWith(".css") ||
+    requestUrl.pathname.endsWith(".html");
 
+  if (isAppCode) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(CACHE_VERSION);
+
+        try {
+          const response = await fetch(request, {
+            cache: "no-cache"
+          });
+
+          if (response.ok && response.type === "basic") {
+            await cache.put(request, response.clone());
+          }
+
+          return response;
+        } catch (error) {
+          const cachedResponse = await cache.match(request);
+
+          if (cachedResponse) return cachedResponse;
+
+          return new Response(
+            "This resource is unavailable offline.",
+            {
+              status: 503,
+              headers: {
+                "Content-Type": "text/plain; charset=utf-8"
+              }
+            }
+          );
+        }
+      })()
+    );
+
+    return;
+  }
+
+  // Other static resources: cache first.
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_VERSION);
@@ -140,10 +182,7 @@ self.addEventListener("fetch", (event) => {
       try {
         const response = await fetch(request);
 
-        if (
-          response.ok &&
-          response.type === "basic"
-        ) {
+        if (response.ok && response.type === "basic") {
           await cache.put(request, response.clone());
         }
 
