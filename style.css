@@ -1,6 +1,6 @@
 /* =========================================================
    I FIND AI — PREMIUM DESIGN SYSTEM
-   File: style.css
+   Version: 2.2 — Colorful Icon Update
    ========================================================= */
 
 :root {
@@ -61,7 +61,9 @@ img, video { display: block; max-width: 100%; }
   background: rgba(117, 136, 255, 0.55);
 }
 
-/* WELCOME SCREEN */
+/* =========================================================
+   WELCOME SCREEN
+   ========================================================= */
 
 .welcome-screen {
   position: fixed;
@@ -192,7 +194,9 @@ img, video { display: block; max-width: 100%; }
   animation: welcomeProgress 5s linear forwards;
 }
 
-/* MAIN WEBSITE */
+/* =========================================================
+   MAIN WEBSITE
+   ========================================================= */
 
 #main-website {
   min-height: 100vh;
@@ -204,7 +208,9 @@ img, video { display: block; max-width: 100%; }
 
 #main-website.is-hidden { display: none; }
 
-/* HEADER */
+/* =========================================================
+   HEADER AND BRAND
+   ========================================================= */
 
 .site-header {
   position: sticky;
@@ -222,8 +228,6 @@ img, video { display: block; max-width: 100%; }
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
-
-/* Updated brand: square logo removed, text enlarged */
 
 .brand-logo {
   display: inline-flex;
@@ -292,7 +296,9 @@ img, video { display: block; max-width: 100%; }
   transform: translateY(-8px) rotate(-45deg);
 }
 
-/* HERO */
+/* =========================================================
+   HERO SECTION
+   ========================================================= */
 
 .hero-section {
   position: relative;
@@ -328,11 +334,21 @@ img, video { display: block; max-width: 100%; }
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  display: inline-grid;
+  place-items: center;
   border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 12px var(--success);
+  background: linear-gradient(135deg, #19d3a2, #38bdf8);
+  box-shadow: 0 0 16px #19d3a255;
+}
+
+.status-dot::after {
+  content: "✓";
+  color: #061a20;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .hero-content h1 {
@@ -407,7 +423,9 @@ img, video { display: block; max-width: 100%; }
   font-size: 12px;
 }
 
-/* HERO MASCOT */
+/* =========================================================
+   HERO MASCOT
+   ========================================================= */
 
 .hero-visual {
   display: grid;
@@ -484,8 +502,24 @@ img, video { display: block; max-width: 100%; }
 }
 
 .floating-element span {
-  color: var(--cyan);
-  font-size: 19px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0;
+}
+
+.floating-image span::before {
+  content: "🖼️";
+  font-size: 20px;
+}
+
+.floating-video span::before {
+  content: "🎬";
+  font-size: 20px;
+}
+
+.floating-text span::before {
+  content: "✍️";
+  font-size: 20px;
 }
 
 .floating-image {
@@ -506,7 +540,9 @@ img, video { display: block; max-width: 100%; }
   animation: floatingLabel 5s ease-in-out infinite 1s;
 }
 
-/* ADVERTISEMENTS */
+/* =========================================================
+   ADVERTISEMENTS
+   ========================================================= */
 
 .ad-section {
   width: min(100% - 32px, 1000px);
@@ -527,7 +563,9 @@ img, video { display: block; max-width: 100%; }
   letter-spacing: 2px;
 }
 
-/* SECTION HEADING */
+/* =========================================================
+   SECTION HEADING
+   ========================================================= */
 
 .section-heading {
   max-width: 700px;
@@ -550,7 +588,9 @@ img, video { display: block; max-width: 100%; }
   font-size: 14px;
 }
 
-/* DETECTION STUDIO */
+/* =========================================================
+   DETECTION STUDIO
+   ========================================================= */
 
 .detector-section {
   max-width: 920px;
@@ -595,7 +635,19 @@ img, video { display: block; max-width: 100%; }
   box-shadow: 0 4px 16px rgba(117, 136, 255, 0.23);
 }
 
-.detector-tab span { font-size: 17px; }
+.detector-tab span {
+  font-size: 20px;
+  transition: transform 250ms ease;
+}
+
+#tab-image span { color: #ffb84d; }
+#tab-video span { color: #ff647c; }
+#tab-text span { color: #5de5ff; }
+
+.detector-tab.active span {
+  filter: brightness(1.3);
+  transform: scale(1.12);
+}
 
 .detector-panel {
   padding: clamp(20px, 5vw, 40px);
@@ -604,6 +656,10 @@ img, video { display: block; max-width: 100%; }
   background: linear-gradient(145deg, rgba(28, 42, 72, 0.7), rgba(14, 21, 39, 0.95));
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.17);
 }
+
+/* =========================================================
+   UPLOAD AREA
+   ========================================================= */
 
 .upload-area {
   min-height: 280px;
@@ -619,7 +675,8 @@ img, video { display: block; max-width: 100%; }
   transition: var(--transition);
 }
 
-.upload-area.drag-over {
+.upload-area.drag-over,
+.upload-area.is-dragging {
   border-color: var(--cyan);
   background: rgba(85, 230, 242, 0.07);
   transform: scale(1.01);
@@ -636,6 +693,7 @@ img, video { display: block; max-width: 100%; }
   color: var(--cyan);
   background: rgba(85, 230, 242, 0.07);
   font-size: 27px;
+  overflow: hidden;
 }
 
 .upload-area h3 {
@@ -672,7 +730,9 @@ img, video { display: block; max-width: 100%; }
   color: #7f8aa7;
 }
 
-/* PREVIEW */
+/* =========================================================
+   FILE PREVIEW
+   ========================================================= */
 
 .file-preview {
   margin-top: 22px;
@@ -736,7 +796,9 @@ img, video { display: block; max-width: 100%; }
   cursor: not-allowed;
 }
 
-/* WRITING AREA */
+/* =========================================================
+   WRITING AREA
+   ========================================================= */
 
 .writing-area {
   padding: 17px;
@@ -782,7 +844,9 @@ img, video { display: block; max-width: 100%; }
   font-size: 11px;
 }
 
-/* ANALYSIS STATUS */
+/* =========================================================
+   ANALYSIS STATUS
+   ========================================================= */
 
 .analysis-status {
   margin-top: 25px;
@@ -811,7 +875,9 @@ img, video { display: block; max-width: 100%; }
   font-size: 13px;
 }
 
-/* RESULTS */
+/* =========================================================
+   RESULTS
+   ========================================================= */
 
 .results-section {
   margin-top: 45px;
@@ -823,7 +889,9 @@ img, video { display: block; max-width: 100%; }
 
 .results-section #results-content { overflow-wrap: anywhere; }
 
-/* FEATURES */
+/* =========================================================
+   FEATURES
+   ========================================================= */
 
 .features-section {
   max-width: var(--container);
@@ -852,15 +920,69 @@ img, video { display: block; max-width: 100%; }
 }
 
 .feature-icon {
-  width: 43px;
-  height: 43px;
+  position: relative;
+  width: 48px;
+  height: 48px;
   margin-bottom: 18px;
   display: grid;
   place-items: center;
-  border-radius: 13px;
-  color: var(--cyan);
-  background: rgba(85, 230, 242, 0.08);
-  font-size: 21px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 15px;
+  font-size: 25px;
+  overflow: hidden;
+  transition: transform 250ms ease, box-shadow 250ms ease;
+}
+
+.feature-card:nth-child(1) .feature-icon {
+  color: #ffb84d;
+  background: linear-gradient(135deg, #ff9a3d33, #ff4d8d22);
+  box-shadow: 0 5px 22px #ff9a3d18;
+}
+
+.feature-card:nth-child(1) .feature-icon::before { content: "🖼️"; }
+
+.feature-card:nth-child(2) .feature-icon {
+  color: #ff647c;
+  background: linear-gradient(135deg, #ff647c33, #a855f722);
+  box-shadow: 0 5px 22px #ff647c18;
+}
+
+.feature-card:nth-child(2) .feature-icon::before { content: "🎬"; }
+
+.feature-card:nth-child(3) .feature-icon {
+  color: #5de5ff;
+  background: linear-gradient(135deg, #42d9ff33, #536dfe22);
+  box-shadow: 0 5px 22px #42d9ff18;
+}
+
+.feature-card:nth-child(3) .feature-icon::before { content: "✍️"; }
+
+.feature-card:nth-child(4) .feature-icon {
+  color: #c18aff;
+  background: linear-gradient(135deg, #a855f733, #ec489922);
+  box-shadow: 0 5px 22px #a855f718;
+}
+
+.feature-card:nth-child(4) .feature-icon::before { content: "🎭"; }
+
+.feature-card:nth-child(5) .feature-icon {
+  color: #55e6a5;
+  background: linear-gradient(135deg, #10b98133, #22d3ee22);
+  box-shadow: 0 5px 22px #10b98118;
+}
+
+.feature-card:nth-child(5) .feature-icon::before { content: "🛡️"; }
+
+.feature-card:nth-child(6) .feature-icon {
+  color: #ffd166;
+  background: linear-gradient(135deg, #f59e0b33, #f9731622);
+  box-shadow: 0 5px 22px #f59e0b18;
+}
+
+.feature-card:nth-child(6) .feature-icon::before { content: "🔒"; }
+
+.feature-card:hover .feature-icon {
+  transform: translateY(-4px) scale(1.07);
 }
 
 .feature-card h3 {
@@ -874,7 +996,9 @@ img, video { display: block; max-width: 100%; }
   line-height: 1.8;
 }
 
-/* PRIVACY SECTION */
+/* =========================================================
+   PRIVACY SECTION
+   ========================================================= */
 
 .privacy-section {
   max-width: var(--container);
@@ -914,12 +1038,17 @@ img, video { display: block; max-width: 100%; }
   place-items: center;
   border: 1px solid rgba(85, 230, 242, 0.25);
   border-radius: 35px;
-  color: var(--cyan);
-  background: rgba(85, 230, 242, 0.07);
-  font-size: 65px;
+  color: #55e6f2;
+  background: linear-gradient(135deg, #536dfe33, #a855f733);
+  box-shadow: 0 0 35px #536dfe20;
+  font-size: 53px;
 }
 
-/* FOOTER */
+.privacy-symbol::before { content: "🔐"; }
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
 
 .site-footer {
   margin-top: 100px;
@@ -972,7 +1101,9 @@ img, video { display: block; max-width: 100%; }
   font-size: 11px;
 }
 
-/* ANIMATIONS */
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
 
 @keyframes welcomeExit {
   to {
@@ -1034,7 +1165,9 @@ img, video { display: block; max-width: 100%; }
   to { transform: rotate(360deg); }
 }
 
-/* ACCESSIBILITY */
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
 
 :focus-visible {
   outline: 2px solid var(--cyan);
@@ -1052,7 +1185,9 @@ img, video { display: block; max-width: 100%; }
   }
 }
 
-/* TABLET */
+/* =========================================================
+   TABLET
+   ========================================================= */
 
 @media (max-width: 900px) {
   .hero-section {
@@ -1073,7 +1208,9 @@ img, video { display: block; max-width: 100%; }
   }
 }
 
-/* MOBILE NAVIGATION */
+/* =========================================================
+   MOBILE NAVIGATION AND LAYOUT
+   ========================================================= */
 
 @media (max-width: 680px) {
   .site-header {
@@ -1081,9 +1218,7 @@ img, video { display: block; max-width: 100%; }
     padding: 0 17px;
   }
 
-  .brand-logo {
-    font-size: 21px;
-  }
+  .brand-logo { font-size: 21px; }
 
   .main-navigation {
     position: absolute;
@@ -1186,6 +1321,11 @@ img, video { display: block; max-width: 100%; }
     padding: 22px;
   }
 
+  .feature-icon {
+    width: 48px;
+    height: 48px;
+  }
+
   .privacy-section {
     min-height: auto;
     margin: 70px 15px;
@@ -1198,7 +1338,7 @@ img, video { display: block; max-width: 100%; }
     min-width: 80px;
     width: 80px;
     height: 80px;
-    font-size: 43px;
+    font-size: 38px;
     border-radius: 25px;
   }
 
@@ -1211,7 +1351,9 @@ img, video { display: block; max-width: 100%; }
   .footer-links { gap: 16px; }
 }
 
-/* SMALL MOBILE */
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
 
 @media (max-width: 380px) {
   .welcome-character { width: 190px; }
@@ -1220,9 +1362,7 @@ img, video { display: block; max-width: 100%; }
   .hero-content h1 { font-size: 37px; }
 
   .primary-button,
-  .secondary-button {
-    width: 100%;
-  }
+  .secondary-button { width: 100%; }
 
   .upload-area {
     min-height: 255px;
@@ -1231,4 +1371,3 @@ img, video { display: block; max-width: 100%; }
 
   .detector-tab { font-size: 11px; }
 }
-
