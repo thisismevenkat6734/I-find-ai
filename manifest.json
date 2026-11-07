@@ -1,0 +1,43 @@
+
+{
+  "id": "./",
+  "name": "I FIND AI",
+  "short_name": "I Find AI",
+  "description": "Discover what's real. Explore AI-generated images, videos and writing with I Find AI.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#080b18",
+  "theme_color": "#080b18",
+  "categories": [
+    "education",
+    "utilities",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
