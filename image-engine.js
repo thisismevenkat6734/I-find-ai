@@ -1,47 +1,42 @@
 import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 
 const MODEL_ID = "onnx-community/ai-image-detection-ONNX";
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024;
 
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
+const input = document.getElementById("image-file");
+const analyzeButton = document.getElementById("analyze-image");
+const statusBox = document.getElementById("analysis-status");
+const statusMessage = document.getElementById("analysis-message");
+const resultsSection = document.getElementById("results-section");
+const resultsContent = document.getElementById("results-content");
+
 let detector = null;
 let loadingPromise = null;
 
-const elements = {
-  input: document.querySelector("#image-upload"),
-  button: document.querySelector("#image-analyze-btn"),
-  result: document.querySelector("#analysis-results")
-};
+function setStatus(message, visible = true) {
+  if (!statusBox || !statusMessage) return;
 
-function showMessage(message) {
-  if (elements.result) {
-    elements.result.textContent = message;
+  statusMessage.textContent = message;
+  statusBox.hidden = !visible;
+}
+
+function clearResults() {
+  if (resultsContent) {
+    resultsContent.replaceChildren();
+  }
+
+  if (resultsSection) {
+    resultsSection.hidden = true;
   }
 }
 
-function getVerdict(predictions) {
-  const ai = predictions.find(item =>
-    /fake|artificial|ai.generated|synthetic/i.test(item.label)
-  );
-
-  const real = predictions.find(item =>
-    /real|human|authentic/i.test(item.label)
-  );
-
-  if (!ai || !real) {
-    throw new Error("Model labels could not be identified.");
+function createDetector() {
+  if (detector) {
+    return Promise.resolve(detector);
   }
-
-  return {
-    aiScore: ai.score,
-    realScore: real.score,
-    verdict: ai.score >= real.score ? "AI-generated signals" : "Real-image signals"
-  };
-}
-
-async function loadDetector() {
-  if (detector) return detector;
 
   if (!loadingPromise) {
     loadingPromise = pipeline(
@@ -49,107 +44,170 @@ async function loadDetector() {
       MODEL_ID,
       {
         device: "wasm",
-        dtype: "q8"
+        dtype: "q4",
+        progress_callback: (progress) => {
+          if (progress.status === "progress" && progress.progress != null) {
+            setStatus(
+              `Downloading AI model: ${Math.round(progress.progress)}%`
+            );
+          } else if (progress.status === "downloading") {
+            setStatus("Downloading AI detection model...");
+          } else if (progress.status === "ready") {
+            setStatus("AI model is ready. Preparing image...");
+          }
+        }
       }
     );
   }
 
-  try {
-    detector = await loadingPromise;
-    return detector;
-  } catch (error) {
-    loadingPromise = null;
-    throw error;
-  }
+  return loadingPromise
+    .then((model) => {
+      detector = model;
+      return detector;
+    })
+    .catch((error) => {
+      loadingPromise = null;
+      throw error;
+    });
 }
 
-async function analyzeImage(file) {
-  if (!(file instanceof File) || !file.type.startsWith("image/")) {
-    throw new Error("Please select a valid image.");
+function getScores(predictions) {
+  const fakeResult = predictions.find((item) =>
+    item.label.toLowerCase().includes("fake")
+  );
+
+  const realResult = predictions.find((item) =>
+    item.label.toLowerCase().includes("real")
+  );
+
+  if (!fakeResult || !realResult) {
+    throw new Error("The model returned unexpected classification labels.");
   }
 
-  const maxSize = 15 * 1024 * 1024;
-
-  if (file.size > maxSize) {
-    throw new Error("Image size must be below 15 MB.");
-  }
-
-  showMessage("Loading AI detection model... First download may take time.");
-
-  const model = await loadDetector();
-
-  showMessage("Analyzing image on your device...");
-
-  const imageURL = URL.createObjectURL(file);
-
-  try {
-    const predictions = await model(imageURL);
-    const result = getVerdict(predictions);
-
-    return result;
-  } finally {
-    URL.revokeObjectURL(imageURL);
-  }
+  return {
+    fakeScore: fakeResult.score,
+    realScore: realResult.score
+  };
 }
 
-function displayResult(result) {
-  if (!elements.result) return;
+function addResultLine(parent, label, value) {
+  const paragraph = document.createElement("p");
+  const strong = document.createElement("strong");
 
-  const aiPercent = (result.aiScore * 100).toFixed(1);
-  const realPercent = (result.realScore * 100).toFixed(1);
+  strong.textContent = `${label}: `;
+  paragraph.append(strong, document.createTextNode(value));
+  parent.appendChild(paragraph);
+}
 
-  elements.result.replaceChildren();
+function displayResults(scores) {
+  if (!resultsSection || !resultsContent) {
+    throw new Error("Results section was not found in index.html.");
+  }
+
+  resultsContent.replaceChildren();
 
   const heading = document.createElement("h3");
-  heading.textContent = result.verdict;
+  const fakePercent = (scores.fakeScore * 100).toFixed(1);
+  const realPercent = (scores.realScore * 100).toFixed(1);
 
-  const ai = document.createElement("p");
-  ai.textContent = `AI-generated score: ${aiPercent}%`;
+  heading.textContent =
+    scores.fakeScore >= scores.realScore
+      ? "AI-generated signals detected"
+      : "Real-image signals detected";
 
-  const real = document.createElement("p");
-  real.textContent = `Real-image score: ${realPercent}%`;
+  const explanation = document.createElement("p");
+  explanation.textContent =
+    "The model's strongest classification is shown below. This is an automated prediction, not proof of image origin.";
 
-  const note = document.createElement("p");
-  note.textContent =
-    "This is a model prediction, not proof of image origin. Results can be wrong, especially for edited, compressed, or unfamiliar images.";
+  const details = document.createElement("div");
+  details.className = "image-analysis-details";
 
-  elements.result.append(heading, ai, real, note);
+  addResultLine(details, "AI-generated model score", `${fakePercent}%`);
+  addResultLine(details, "Real-image model score", `${realPercent}%`);
+
+  const warning = document.createElement("p");
+  warning.className = "analysis-disclaimer";
+  warning.textContent =
+    "Important: These scores are model outputs, not guaranteed probabilities. The model was trained on CIFAKE data and may perform differently on newer AI generators, edited images, screenshots and compressed images.";
+
+  resultsContent.append(heading, explanation, details, warning);
+  resultsSection.hidden = false;
 }
 
-async function handleAnalysis() {
-  const file = elements.input?.files?.[0];
+async function analyzeSelectedImage() {
+  const file = input?.files?.[0];
 
   if (!file) {
-    showMessage("Please select an image first.");
+    setStatus("Please choose an image first.");
     return;
   }
 
-  if (elements.button) {
-    elements.button.disabled = true;
-    elements.button.textContent = "Analyzing...";
+  if (!file.type.startsWith("image/")) {
+    setStatus("Please select a valid image file.");
+    return;
   }
 
+  if (file.size > MAX_IMAGE_SIZE) {
+    setStatus("Image size must be 15 MB or smaller.");
+    return;
+  }
+
+  clearResults();
+
+  if (analyzeButton) {
+    analyzeButton.disabled = true;
+    analyzeButton.textContent = "Analyzing...";
+  }
+
+  let imageURL = null;
+
   try {
-    const result = await analyzeImage(file);
-    displayResult(result);
+    setStatus("Loading AI detection model...");
+
+    const model = await createDetector();
+
+    setStatus("Analyzing your image on this device...");
+
+    imageURL = URL.createObjectURL(file);
+
+    const predictions = await model(imageURL);
+    const scores = getScores(predictions);
+
+    displayResults(scores);
+    setStatus("Image analysis completed.", false);
+
   } catch (error) {
-    console.error("I FIND AI image engine:", error);
-    showMessage(`Analysis failed: ${error.message}`);
+    console.error("I FIND AI image analysis error:", error);
+
+    setStatus(
+      error.message || "Something went wrong. Please try again."
+    );
+
   } finally {
-    if (elements.button) {
-      elements.button.disabled = false;
-      elements.button.textContent = "Analyze Image";
+    if (imageURL) {
+      URL.revokeObjectURL(imageURL);
+    }
+
+    if (analyzeButton) {
+      analyzeButton.disabled = !input?.files?.length;
+      analyzeButton.innerHTML = 'Analyze Image <span>→</span>';
     }
   }
 }
 
-if (elements.button) {
-  elements.button.addEventListener("click", handleAnalysis);
+if (analyzeButton) {
+  analyzeButton.addEventListener("click", analyzeSelectedImage);
 }
 
-window.IFindAIImageEngine = {
-  analyzeImage,
-  loadDetector
-};
+if (input) {
+  input.addEventListener("change", () => {
+    clearResults();
+    setStatus("", false);
 
-console.info("I FIND AI image engine initialized.");
+    if (analyzeButton) {
+      analyzeButton.disabled = !input.files?.length;
+    }
+  });
+}
+
+console.info("I FIND AI image detector engine initialized.");
