@@ -40,17 +40,13 @@
         >
       </div>
 
-      <p class="welcome-greeting" id="welcome-greeting">
-        Hii! 👋
-      </p>
+      <p class="welcome-greeting" id="welcome-greeting">Hii! 👋</p>
 
       <h1 class="welcome-brand">
         Welcome to <span>I FIND AI</span>
       </h1>
 
-      <p class="welcome-message">
-        Have a good day! ✨
-      </p>
+      <p class="welcome-message">Have a good day! ✨</p>
 
     </div>
 
@@ -60,7 +56,6 @@
 
   </div>
 
-
   <!-- MAIN WEBSITE -->
   <div id="main-website">
 
@@ -68,11 +63,10 @@
     <header class="site-header">
 
       <a href="#home" class="brand-logo" aria-label="I Find AI Home">
-        <span class="brand-symbol">I</span>
         <span>I FIND <strong>AI</strong></span>
       </a>
 
-      <nav class="main-navigation" aria-label="Main navigation">
+      <nav class="main-navigation" id="main-navigation" aria-label="Main navigation">
         <a href="#home">Home</a>
         <a href="#detector">AI Detector</a>
         <a href="#features">Features</a>
@@ -81,7 +75,9 @@
 
       <button class="mobile-menu-button"
               id="mobile-menu-button"
+              type="button"
               aria-label="Open navigation"
+              aria-controls="main-navigation"
               aria-expanded="false">
         <span></span>
         <span></span>
@@ -89,7 +85,6 @@
       </button>
 
     </header>
-
 
     <!-- HERO SECTION -->
     <main>
@@ -171,14 +166,12 @@
 
       </section>
 
-
       <!-- ADVERTISEMENT AREA -->
       <section class="ad-section" aria-label="Advertisement">
         <div class="ad-placeholder">
           <span>ADVERTISEMENT</span>
         </div>
       </section>
-
 
       <!-- DETECTION STUDIO -->
       <section class="detector-section" id="detector">
@@ -191,11 +184,8 @@
             <span>to verify?</span>
           </h2>
 
-          <p>
-            Choose your content type to begin an analysis.
-          </p>
+          <p>Choose your content type to begin an analysis.</p>
         </div>
-
 
         <!-- DETECTION MODE SELECTOR -->
         <div class="detector-tabs"
@@ -204,6 +194,7 @@
 
           <button class="detector-tab active"
                   id="tab-image"
+                  type="button"
                   role="tab"
                   aria-selected="true"
                   aria-controls="panel-image"
@@ -214,6 +205,7 @@
 
           <button class="detector-tab"
                   id="tab-video"
+                  type="button"
                   role="tab"
                   aria-selected="false"
                   aria-controls="panel-video"
@@ -224,6 +216,7 @@
 
           <button class="detector-tab"
                   id="tab-text"
+                  type="button"
                   role="tab"
                   aria-selected="false"
                   aria-controls="panel-text"
@@ -234,7 +227,6 @@
 
         </div>
 
-
         <!-- IMAGE PANEL -->
         <div class="detector-panel active"
              id="panel-image"
@@ -244,7 +236,6 @@
           <div class="upload-area" id="image-upload-area">
 
             <div class="upload-icon">▧</div>
-
             <h3>Upload an Image</h3>
 
             <p>
@@ -263,9 +254,7 @@
               hidden
             >
 
-            <p class="upload-hint">
-              JPG, PNG, WEBP or GIF
-            </p>
+            <p class="upload-hint">JPG, PNG, WEBP or GIF</p>
 
           </div>
 
@@ -275,13 +264,12 @@
             <button type="button" id="remove-image">Remove Image</button>
           </div>
 
-          <button class="analyze-button" id="analyze-image" disabled>
+          <button class="analyze-button" id="analyze-image" type="button" disabled>
             Analyze Image
             <span>→</span>
           </button>
 
         </div>
-
 
         <!-- VIDEO PANEL -->
         <div class="detector-panel"
@@ -293,7 +281,6 @@
           <div class="upload-area" id="video-upload-area">
 
             <div class="upload-icon">▶</div>
-
             <h3>Upload a Video</h3>
 
             <p>
@@ -312,9 +299,7 @@
               hidden
             >
 
-            <p class="upload-hint">
-              MP4, WEBM or MOV
-            </p>
+            <p class="upload-hint">MP4, WEBM or MOV</p>
 
           </div>
 
@@ -324,13 +309,12 @@
             <button type="button" id="remove-video">Remove Video</button>
           </div>
 
-          <button class="analyze-button" id="analyze-video" disabled>
+          <button class="analyze-button" id="analyze-video" type="button" disabled>
             Analyze Video
             <span>→</span>
           </button>
 
         </div>
-
 
         <!-- TEXT PANEL -->
         <div class="detector-panel"
@@ -354,22 +338,20 @@
 
             <div class="writing-footer">
               <span id="character-count">0 / 10,000</span>
-              <button type="button" id="clear-writing">
-                Clear text
-              </button>
+              <button type="button" id="clear-writing">Clear text</button>
             </div>
 
           </div>
 
           <button class="analyze-button"
                   id="analyze-writing"
+                  type="button"
                   disabled>
             Analyze Writing
             <span>→</span>
           </button>
 
         </div>
-
 
         <!-- ANALYSIS STATUS -->
         <div class="analysis-status"
@@ -382,7 +364,6 @@
           <p id="analysis-message">Preparing analysis...</p>
 
         </div>
-
 
         <!-- RESULTS -->
         <section class="results-section"
@@ -401,14 +382,12 @@
 
       </section>
 
-
       <!-- MIDDLE ADVERTISEMENT -->
       <section class="ad-section" aria-label="Advertisement">
         <div class="ad-placeholder">
           <span>ADVERTISEMENT</span>
         </div>
       </section>
-
 
       <!-- FEATURES -->
       <section class="features-section" id="features">
@@ -487,7 +466,6 @@
 
       </section>
 
-
       <!-- PRIVACY SECTION -->
       <section class="privacy-section" id="about">
 
@@ -512,7 +490,6 @@
 
       </section>
 
-
       <!-- BOTTOM ADVERTISEMENT -->
       <section class="ad-section" aria-label="Advertisement">
         <div class="ad-placeholder">
@@ -521,7 +498,6 @@
       </section>
 
     </main>
-
 
     <!-- FOOTER -->
     <footer class="site-footer">
