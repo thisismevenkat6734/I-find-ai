@@ -1,0 +1,5 @@
+
+User-agent: *
+Allow: /
+
+Sitemap: https://thisismevenkat6734.github.io/I-find-ai/sitemap.xml
