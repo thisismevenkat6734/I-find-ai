@@ -11,11 +11,34 @@
   <main>
     <h1>I FIND AI</h1>
     <p>AI Image Detection Engine</p>
-    <p id="engine-status" role="status" aria-live="polite">
+    <p id="engine-status" role="status">
       Starting detection engine...
     </p>
+    <pre id="engine-errors" style="white-space:pre-wrap;color:#c00"></pre>
   </main>
 
-  <script type="module" src="./src/main.js"></script>
+  <script>
+    window.addEventListener("error", function(event) {
+      const box = document.getElementById("engine-errors");
+      if (box) {
+        box.textContent += "JavaScript error: " +
+          (event.message || "Unknown error") + "\n";
+      }
+    });
+
+    window.addEventListener("unhandledrejection", function(event) {
+      const box = document.getElementById("engine-errors");
+      if (box) {
+        box.textContent += "Module error: " +
+          (event.reason?.message || String(event.reason)) + "\n";
+      }
+    });
+  </script>
+
+  <script
+    type="module"
+    src="./src/main.js"
+    onerror="document.getElementById('engine-status').textContent='JavaScript module failed to load.'">
+  </script>
 </body>
 </html>
