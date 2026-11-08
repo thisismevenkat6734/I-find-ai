@@ -1,0 +1,72 @@
+name: Build and Deploy I FIND AI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - "style.css"
+      - "script.js"
+      - "assets/**"
+      - "ai-engine/**"
+      - ".github/workflows/deploy-engine.yml"
+      - "manifest.json"
+      - "sw.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install engine dependencies
+        working-directory: ai-engine
+        run: npm install --no-audit --no-fund
+
+      - name: Build AI engine
+        working-directory: ai-engine
+        run: npm run build
+
+      - name: Prepare website
+        run: |
+          mkdir -p _site
+          rsync -av ./ _site/ \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='ai-engine' \
+            --exclude='_site' \
+            --exclude='node_modules'
+
+      - name: Add AI engine
+        run: |
+          mkdir -p _site/engine
+          cp -R ai-engine/dist/. _site/engine/
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
