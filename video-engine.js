@@ -3,6 +3,7 @@
 /* =========================================
    I FIND AI — DEEPFAKE FRAME SCREENING
    Q4 Quantized ONNX Model
+   Version 2.2 — Detailed Error Reporting
    ========================================= */
 
 const VideoEngine = (() => {
@@ -20,8 +21,6 @@ const VideoEngine = (() => {
   let activeURL = null;
   let cancelled = false;
 
-  /* FILE VALIDATION */
-
   function validateFile(file) {
     if (!(file instanceof File)) {
       throw new Error("Please select a video file.");
@@ -38,8 +37,6 @@ const VideoEngine = (() => {
     return true;
   }
 
-  /* RESOURCE CLEANUP */
-
   function releaseVideo() {
     if (activeVideo) {
       activeVideo.pause();
@@ -54,7 +51,9 @@ const VideoEngine = (() => {
     }
   }
 
-  /* LOAD Q4 CLASSIFIER */
+  /* =======================================
+     LOAD Q4 MODEL WITH DETAILED ERRORS
+     ======================================= */
 
   async function loadClassifier(onProgress) {
     if (!classifierPromise) {
@@ -62,9 +61,11 @@ const VideoEngine = (() => {
         if (typeof onProgress === "function") {
           onProgress({
             stage: "model-loading",
-            message: "Loading optimized Q4 deepfake model..."
+            message: "Loading Q4 deepfake detection model..."
           });
         }
+
+        console.info("I FIND AI: Loading model:", CONFIG.model);
 
         const { pipeline, env } = await import(
           "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2"
@@ -79,6 +80,8 @@ const VideoEngine = (() => {
             device: "wasm",
             dtype: "q4",
             progress_callback: (progress) => {
+              console.info("Model download progress:", progress);
+
               if (typeof onProgress === "function") {
                 onProgress({
                   stage: "model-download",
@@ -89,13 +92,25 @@ const VideoEngine = (() => {
           }
         );
 
+        console.info("I FIND AI: Deepfake model loaded successfully.");
+
         return model;
+
       })().catch((error) => {
         classifierPromise = null;
-        console.error("Deepfake model loading failed:", error);
+
+        console.error("DEEPFAKE MODEL ERROR:", error);
+        console.error("Error name:", error?.name);
+        console.error("Error message:", error?.message);
+        console.error("Error stack:", error?.stack);
+
+        const details =
+          error?.message ||
+          error?.toString() ||
+          "Unknown model loading error.";
 
         throw new Error(
-          "Deepfake model could not load. Check your internet connection or model compatibility and try again."
+          "Deepfake model loading failed: " + details
         );
       });
     }
@@ -103,7 +118,9 @@ const VideoEngine = (() => {
     return classifierPromise;
   }
 
-  /* LOAD VIDEO */
+  /* =======================================
+     LOAD VIDEO
+     ======================================= */
 
   function loadVideo(file) {
     return new Promise((resolve, reject) => {
@@ -149,7 +166,9 @@ const VideoEngine = (() => {
     });
   }
 
-  /* SEEK TO FRAME */
+  /* =======================================
+     SEEK TO FRAME
+     ======================================= */
 
   function seekTo(video, time) {
     return new Promise((resolve, reject) => {
@@ -167,7 +186,6 @@ const VideoEngine = (() => {
 
       function finish(error) {
         if (finished) return;
-
         finished = true;
         cleanup();
 
@@ -194,7 +212,9 @@ const VideoEngine = (() => {
     });
   }
 
-  /* FRAME SAMPLING */
+  /* =======================================
+     FRAME SAMPLING
+     ======================================= */
 
   function sampleTimes(duration) {
     const count = Math.min(
@@ -205,13 +225,13 @@ const VideoEngine = (() => {
     const lastTime = Math.max(0, duration - 0.05);
 
     return Array.from({ length: count }, (_, index) =>
-      Number(
-        (lastTime * index / (count - 1)).toFixed(3)
-      )
+      Number((lastTime * index / (count - 1)).toFixed(3))
     );
   }
 
-  /* CREATE FRAME */
+  /* =======================================
+     CREATE FRAME CANVAS
+     ======================================= */
 
   function makeFrameCanvas(video) {
     const scale = Math.min(
@@ -248,7 +268,9 @@ const VideoEngine = (() => {
     return canvas;
   }
 
-  /* MODEL OUTPUT INTERPRETATION */
+  /* =======================================
+     INTERPRET MODEL PREDICTION
+     ======================================= */
 
   function interpretPrediction(predictions) {
     const normalized = predictions.map((item) => ({
@@ -274,17 +296,18 @@ const VideoEngine = (() => {
     }
 
     return {
-      status:
-        fake.score > real.score
-          ? "deepfake-like"
-          : "real-like",
+      status: fake.score > real.score
+        ? "deepfake-like"
+        : "real-like",
       fakeScore: fake.score,
       realScore: real.score,
       predictions: normalized
     };
   }
 
-  /* MAIN ANALYSIS */
+  /* =======================================
+     MAIN ANALYSIS
+     ======================================= */
 
   async function analyze(file, onProgress) {
     cancelled = false;
@@ -322,7 +345,6 @@ const VideoEngine = (() => {
         const imageData = canvas.toDataURL("image/jpeg", 0.85);
 
         const predictions = await classifier(imageData);
-
         const result = interpretPrediction(predictions);
 
         frameResults.push({
@@ -440,4 +462,3 @@ const VideoEngine = (() => {
 })();
 
 window.IFindAIVideoEngine = VideoEngine;
-
