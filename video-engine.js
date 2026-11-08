@@ -1,66 +1,43 @@
 "use strict";
 
 /* =========================================
-   I FIND AI — VIDEO INSPECTION ENGINE
-   Version: 2.0
-   Browser-local frame extraction
+   I FIND AI — DEEPFAKE FRAME SCREENING
+   Model: Deep-Fake-Detector-v2-Model-ONNX
+   Runtime: Transformers.js / ONNX
    ========================================= */
 
 const VideoEngine = (() => {
-  const CONFIG = Object.freeze({
+  const CONFIG = {
+    model: "onnx-community/Deep-Fake-Detector-v2-Model-ONNX",
     maxFileSize: 100 * 1024 * 1024,
     maxDuration: 300,
     maxFrames: 12,
-    sampleIntervalSeconds: 1,
-    frameWidth: 320,
-    seekTimeout: 10000
-  });
+    sampleInterval: 1,
+    frameWidth: 320
+  };
 
+  let classifierPromise = null;
   let activeVideo = null;
-  let activeObjectUrl = null;
+  let activeURL = null;
   let cancelled = false;
-
-  /* =======================================
-     1. FILE VALIDATION
-     ======================================= */
 
   function validateFile(file) {
     if (!(file instanceof File)) {
       throw new Error("Please select a video file.");
     }
 
-    const allowedTypes = [
-      "video/mp4",
-      "video/webm",
-      "video/quicktime",
-      "video/x-m4v"
-    ];
-
-    const validExtension =
-      /\.(mp4|webm|mov|m4v)$/i.test(file.name);
-
-    if (!allowedTypes.includes(file.type) && !validExtension) {
-      throw new Error(
-        "Supported formats: MP4, WebM, MOV and M4V."
-      );
+    if (!/\.(mp4|webm|mov|m4v)$/i.test(file.name)) {
+      throw new Error("Supported formats: MP4, WebM, MOV and M4V.");
     }
 
-    if (file.size === 0) {
-      throw new Error("The selected video is empty.");
-    }
-
-    if (file.size > CONFIG.maxFileSize) {
-      throw new Error("Video size must be 100 MB or less.");
+    if (!file.size || file.size > CONFIG.maxFileSize) {
+      throw new Error("Video size must be between 1 byte and 100 MB.");
     }
 
     return true;
   }
 
-  /* =======================================
-     2. RELEASE RESOURCES
-     ======================================= */
-
-  function release() {
+  function releaseVideo() {
     if (activeVideo) {
       activeVideo.pause();
       activeVideo.removeAttribute("src");
@@ -68,55 +45,74 @@ const VideoEngine = (() => {
       activeVideo = null;
     }
 
-    if (activeObjectUrl) {
-      URL.revokeObjectURL(activeObjectUrl);
-      activeObjectUrl = null;
+    if (activeURL) {
+      URL.revokeObjectURL(activeURL);
+      activeURL = null;
     }
   }
 
-  /* =======================================
-     3. LOAD VIDEO METADATA
-     ======================================= */
+  async function loadClassifier(onProgress) {
+    if (!classifierPromise) {
+      classifierPromise = (async () => {
+        if (typeof onProgress === "function") {
+          onProgress({
+            stage: "model-loading",
+            message: "Loading deepfake detection model..."
+          });
+        }
+
+        const { pipeline, env } = await import(
+          "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2"
+        );
+
+        env.allowRemoteModels = true;
+
+        const model = await pipeline(
+          "image-classification",
+          CONFIG.model,
+          {
+            device: "wasm"
+          }
+        );
+
+        return model;
+      })().catch((error) => {
+        classifierPromise = null;
+        throw error;
+      });
+    }
+
+    return classifierPromise;
+  }
 
   function loadVideo(file) {
     return new Promise((resolve, reject) => {
       const video = document.createElement("video");
       const url = URL.createObjectURL(file);
 
-      activeObjectUrl = url;
       activeVideo = video;
+      activeURL = url;
 
       video.preload = "metadata";
       video.muted = true;
       video.playsInline = true;
 
-      function cleanup() {
+      video.onloadedmetadata = () => {
         video.onloadedmetadata = null;
         video.onerror = null;
-      }
 
-      video.onloadedmetadata = () => {
-        cleanup();
-
-        if (
-          !Number.isFinite(video.duration) ||
-          video.duration <= 0
-        ) {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) {
           reject(new Error("Invalid video duration."));
           return;
         }
 
         if (video.duration > CONFIG.maxDuration) {
-          reject(
-            new Error("Maximum supported video duration is 5 minutes.")
-          );
+          reject(new Error("Maximum video duration is 5 minutes."));
           return;
         }
 
         if (!video.videoWidth || !video.videoHeight) {
-          reject(
-            new Error("Video dimensions could not be read.")
-          );
+          reject(new Error("Video dimensions could not be read."));
           return;
         }
 
@@ -124,49 +120,34 @@ const VideoEngine = (() => {
       };
 
       video.onerror = () => {
-        cleanup();
-
-        reject(
-          new Error("Unable to read this video. Try another file.")
-        );
+        video.onloadedmetadata = null;
+        video.onerror = null;
+        reject(new Error("Unable to decode this video."));
       };
 
       video.src = url;
     });
   }
 
-  /* =======================================
-     4. VIDEO SEEK
-     ======================================= */
-
   function seekTo(video, time) {
     return new Promise((resolve, reject) => {
-      let settled = false;
+      let finished = false;
 
-      const timeout = window.setTimeout(() => {
-        finish(
-          new Error("Video frame extraction timed out.")
-        );
-      }, CONFIG.seekTimeout);
+      const timeout = setTimeout(() => {
+        finish(new Error("Frame extraction timed out."));
+      }, 10000);
 
       function cleanup() {
-        window.clearTimeout(timeout);
-
+        clearTimeout(timeout);
         video.removeEventListener("seeked", onSeeked);
         video.removeEventListener("error", onError);
       }
 
       function finish(error) {
-        if (settled) return;
-
-        settled = true;
+        if (finished) return;
+        finished = true;
         cleanup();
-
-        if (error) {
-          reject(error);
-        } else {
-          resolve();
-        }
+        error ? reject(error) : resolve();
       }
 
       function onSeeked() {
@@ -174,9 +155,7 @@ const VideoEngine = (() => {
       }
 
       function onError() {
-        finish(
-          new Error("Unable to decode a video frame.")
-        );
+        finish(new Error("Unable to decode video frame."));
       }
 
       video.addEventListener("seeked", onSeeked);
@@ -185,252 +164,179 @@ const VideoEngine = (() => {
       try {
         video.currentTime = time;
       } catch (error) {
-        finish(
-          new Error("Unable to seek to the requested video frame.")
-        );
+        finish(error);
       }
     });
   }
 
-  /* =======================================
-     5. FRAME EXTRACTION
-     ======================================= */
+  function sampleTimes(duration) {
+    const count = Math.min(
+      CONFIG.maxFrames,
+      Math.max(2, Math.ceil(duration / CONFIG.sampleInterval))
+    );
 
-  function extractFrame(video, time) {
+    const lastTime = Math.max(0, duration - 0.05);
+
+    return Array.from({ length: count }, (_, index) =>
+      Number((lastTime * index / (count - 1)).toFixed(3))
+    );
+  }
+
+  function makeFrameCanvas(video) {
     const scale = Math.min(
       1,
       CONFIG.frameWidth / video.videoWidth
     );
 
-    const width = Math.max(
-      1,
-      Math.round(video.videoWidth * scale)
-    );
-
-    const height = Math.max(
-      1,
-      Math.round(video.videoHeight * scale)
-    );
-
     const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
 
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext("2d", {
-      willReadFrequently: true
-    });
+    const context = canvas.getContext("2d");
 
     if (!context) {
       throw new Error("Canvas processing is unavailable.");
     }
 
-    context.drawImage(video, 0, 0, width, height);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const pixels = context.getImageData(
-      0,
-      0,
-      width,
-      height
+    return canvas;
+  }
+
+  function interpretPrediction(predictions) {
+    const normalized = predictions.map((item) => ({
+      label: String(item.label || "").toLowerCase(),
+      score: Number(item.score || 0)
+    }));
+
+    const fake = normalized.find((item) =>
+      /deepfake|deep.fake|fake/.test(item.label)
     );
+
+    const real = normalized.find((item) =>
+      /realism|real|authentic/.test(item.label)
+    );
+
+    if (!fake || !real) {
+      return {
+        status: "inconclusive",
+        fakeScore: null,
+        realScore: null,
+        predictions: normalized
+      };
+    }
 
     return {
-      time,
-      width,
-      height,
-      pixels
+      status: fake.score > real.score ? "deepfake-like" : "real-like",
+      fakeScore: fake.score,
+      realScore: real.score,
+      predictions: normalized
     };
   }
-
-  /* =======================================
-     6. FRAME HASH
-     ======================================= */
-
-  async function hashFrame(frame) {
-    if (!crypto.subtle) {
-      throw new Error(
-        "Secure browser cryptography is unavailable."
-      );
-    }
-
-    const digest = await crypto.subtle.digest(
-      "SHA-256",
-      frame.pixels.data
-    );
-
-    return Array.from(new Uint8Array(digest))
-      .map((value) => value.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  /* =======================================
-     7. FRAME STATISTICS
-     ======================================= */
-
-  function calculateStatistics(frame) {
-    const data = frame.pixels.data;
-
-    let total = 0;
-    let squared = 0;
-    let min = 255;
-    let max = 0;
-    let count = 0;
-
-    for (let i = 0; i < data.length; i += 16) {
-      const luminance =
-        0.299 * data[i] +
-        0.587 * data[i + 1] +
-        0.114 * data[i + 2];
-
-      total += luminance;
-      squared += luminance * luminance;
-
-      min = Math.min(min, luminance);
-      max = Math.max(max, luminance);
-
-      count++;
-    }
-
-    const mean = total / count;
-
-    const variance = Math.max(
-      0,
-      squared / count - mean * mean
-    );
-
-    return {
-      meanLuminance: Number(mean.toFixed(2)),
-      luminanceVariance: Number(variance.toFixed(2)),
-      luminanceRange: Number((max - min).toFixed(2))
-    };
-  }
-
-  /* =======================================
-     8. CALCULATE SAMPLE TIMES
-     ======================================= */
-
-  function calculateSampleTimes(duration) {
-    const desiredFrames =
-      Math.ceil(duration / CONFIG.sampleIntervalSeconds);
-
-    const frameCount = Math.min(
-      CONFIG.maxFrames,
-      Math.max(2, desiredFrames)
-    );
-
-    const lastSafeTime = Math.max(
-      0,
-      duration - 0.05
-    );
-
-    const times = [];
-
-    for (let i = 0; i < frameCount; i++) {
-      const time =
-        frameCount === 1
-          ? 0
-          : (lastSafeTime * i) / (frameCount - 1);
-
-      times.push(Number(time.toFixed(3)));
-    }
-
-    return times;
-  }
-
-  /* =======================================
-     9. EXTRACT ALL SAMPLED FRAMES
-     ======================================= */
-
-  async function extractFrames(video, onProgress) {
-    const times = calculateSampleTimes(video.duration);
-
-    const frames = [];
-
-    for (let i = 0; i < times.length; i++) {
-      if (cancelled) {
-        throw new Error("Video analysis cancelled.");
-      }
-
-      const time = times[i];
-
-      await seekTo(video, time);
-
-      if (cancelled) {
-        throw new Error("Video analysis cancelled.");
-      }
-
-      const frame = extractFrame(
-        video,
-        video.currentTime
-      );
-
-      frame.hash = await hashFrame(frame);
-      frame.statistics = calculateStatistics(frame);
-
-      frames.push(frame);
-
-      if (typeof onProgress === "function") {
-        onProgress({
-          completed: i + 1,
-          total: times.length,
-          percentage: Math.round(
-            ((i + 1) / times.length) * 100
-          )
-        });
-      }
-
-      await new Promise((resolve) => {
-        requestAnimationFrame(resolve);
-      });
-    }
-
-    return frames;
-  }
-
-  /* =======================================
-     10. MAIN ANALYSIS
-     ======================================= */
 
   async function analyze(file, onProgress) {
     cancelled = false;
-    release();
+    releaseVideo();
 
     try {
       validateFile(file);
-
-      if (typeof onProgress === "function") {
-        onProgress({
-          stage: "metadata",
-          percentage: 0
-        });
-      }
 
       const video = await loadVideo(file);
 
       if (typeof onProgress === "function") {
         onProgress({
-          stage: "frame-extraction",
+          stage: "model-loading",
           percentage: 0
         });
       }
 
-      const frames = await extractFrames(
-        video,
-        (progress) => {
-          if (typeof onProgress === "function") {
-            onProgress({
-              stage: "frame-extraction",
-              ...progress
-            });
-          }
-        }
-      );
+      const classifier = await loadClassifier(onProgress);
 
       if (cancelled) {
-        throw new Error("Video analysis cancelled.");
+        throw new Error("Analysis cancelled.");
       }
 
-      const report = {
+      const times = sampleTimes(video.duration);
+      const frameResults = [];
+
+      for (let index = 0; index < times.length; index++) {
+        if (cancelled) {
+          throw new Error("Analysis cancelled.");
+        }
+
+        await seekTo(video, times[index]);
+
+        const canvas = makeFrameCanvas(video);
+        const imageData = canvas.toDataURL("image/jpeg", 0.85);
+
+        if (typeof onProgress === "function") {
+          onProgress({
+            stage: "frame-analysis",
+            completed: index,
+            total: times.length,
+            percentage: Math.round(index / times.length * 100)
+          });
+        }
+
+        const predictions = await classifier(imageData);
+        const result = interpretPrediction(predictions);
+
+        frameResults.push({
+          frameNumber: index + 1,
+          timestamp: times[index],
+          ...result
+        });
+
+        if (typeof onProgress === "function") {
+          onProgress({
+            stage: "frame-analysis",
+            completed: index + 1,
+            total: times.length,
+            percentage: Math.round(
+              (index + 1) / times.length * 100
+            )
+          });
+        }
+
+        await new Promise((resolve) =>
+          requestAnimationFrame(resolve)
+        );
+      }
+
+      const validFrames = frameResults.filter(
+        (frame) => frame.fakeScore !== null
+      );
+
+      const averageFakeScore = validFrames.length
+        ? validFrames.reduce(
+            (sum, frame) => sum + frame.fakeScore, 0
+          ) / validFrames.length
+        : null;
+
+      const deepfakeLikeFrames = validFrames.filter(
+        (frame) => frame.status === "deepfake-like"
+      ).length;
+
+      let verdict = "inconclusive";
+
+      if (validFrames.length) {
+        if (deepfakeLikeFrames / validFrames.length >= 0.7) {
+          verdict = "deepfake-like-signals";
+        } else if (deepfakeLikeFrames / validFrames.length <= 0.3) {
+          verdict = "real-like-signals";
+        }
+      }
+
+      if (typeof onProgress === "function") {
+        onProgress({
+          stage: "completed",
+          percentage: 100,
+          completed: frameResults.length,
+          total: frameResults.length
+        });
+      }
+
+      return {
         file: {
           name: file.name,
           size: file.size,
@@ -440,67 +346,43 @@ const VideoEngine = (() => {
         video: {
           duration: Number(video.duration.toFixed(2)),
           width: video.videoWidth,
-          height: video.videoHeight,
-          aspectRatio: Number(
-            (video.videoWidth / video.videoHeight).toFixed(3)
-          )
+          height: video.videoHeight
         },
 
-        frames: frames.map((frame, index) => ({
-          frameNumber: index + 1,
-          timestamp: Number(frame.time.toFixed(2)),
-          width: frame.width,
-          height: frame.height,
-          sha256: frame.hash,
-          statistics: frame.statistics
-        })),
+        frames: frameResults,
 
         analysis: {
-          extractedFrames: frames.length,
           completed: true,
-          deepfakeModelAvailable: false,
-          verdict: "not-analyzed",
+          model: CONFIG.model,
+          modelType: "image-classifier-applied-to-video-frames",
+          extractedFrames: frameResults.length,
+          analyzedFrames: validFrames.length,
+          deepfakeLikeFrames,
+          averageFakeScore:
+            averageFakeScore === null
+              ? null
+              : Number(averageFakeScore.toFixed(4)),
+          verdict,
           message:
-            "Frame inspection completed. A validated AI video detection model is not connected yet."
+            "Frame-level model screening completed. This is not a validated temporal video deepfake verdict."
         },
 
         privacy: {
           processing: "browser-local",
-          uploadedToServer: false,
-          permanentlyStored: false
+          videoUploadedToServer: false,
+          permanentlyStored: false,
+          modelDownloadedFrom: "Hugging Face"
         }
       };
 
-      if (typeof onProgress === "function") {
-        onProgress({
-          stage: "completed",
-          percentage: 100,
-          completed: frames.length,
-          total: frames.length
-        });
-      }
-
-      return report;
-
-    } catch (error) {
-      throw error;
-
     } finally {
-      release();
+      releaseVideo();
     }
   }
-
-  /* =======================================
-     11. CANCEL
-     ======================================= */
 
   function cancel() {
     cancelled = true;
   }
-
-  /* =======================================
-     12. PUBLIC API
-     ======================================= */
 
   return Object.freeze({
     analyze,
