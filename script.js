@@ -2,7 +2,7 @@
 
 /* =========================================
    I FIND AI — MAIN JAVASCRIPT
-   Version: 2.2
+   Version: 2.3
    ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -38,9 +38,7 @@ function initWelcomeScreen() {
     }
 
     sessionStorage.setItem("ifindai_welcome_seen", "yes");
-  } catch (error) {
-    // Continue if session storage is unavailable.
-  }
+  } catch (error) {}
 
   const reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)"
@@ -184,7 +182,8 @@ const ALLOWED_IMAGES = [
 const ALLOWED_VIDEOS = [
   "video/mp4",
   "video/webm",
-  "video/quicktime"
+  "video/quicktime",
+  "video/x-m4v"
 ];
 
 let selectedImage = null;
@@ -287,17 +286,13 @@ function initImageUpload() {
     }
 
     releaseURL("image");
-
     selectedImage = file;
 
-    // Keep input.files synchronized for image-engine.js.
     try {
       const transfer = new DataTransfer();
       transfer.items.add(file);
       input.files = transfer.files;
-    } catch (error) {
-      // Normal file-picker selection remains available.
-    }
+    } catch (error) {}
 
     imageURL = URL.createObjectURL(file);
 
@@ -312,7 +307,6 @@ function initImageUpload() {
       name.textContent = `${file.name} · ${formatFileSize(file.size)}`;
     }
 
-    // Enable image analysis after valid selection.
     if (analyze) analyze.disabled = false;
 
     hideStatus();
@@ -363,17 +357,32 @@ function initVideoUpload() {
 
     if (preview) preview.hidden = true;
     if (name) name.textContent = "";
+
     if (analyze) analyze.disabled = true;
 
     hideStatus();
+
+    const results = document.getElementById("results-section");
+    const content = document.getElementById("results-content");
+
+    if (results) results.hidden = true;
+    if (content) content.replaceChildren();
   }
 
   function handleVideo(file) {
     if (!file) return;
 
-    if (!ALLOWED_VIDEOS.includes(file.type)) {
+    const validExtension = /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+
+    if (!ALLOWED_VIDEOS.includes(file.type) && !validExtension) {
       clearVideo();
       showStatus("Please select an MP4, WEBM or MOV video.", "error");
+      return;
+    }
+
+    if (file.size === 0) {
+      clearVideo();
+      showStatus("The selected video is empty.", "error");
       return;
     }
 
@@ -384,7 +393,6 @@ function initVideoUpload() {
     }
 
     releaseURL("video");
-
     selectedVideo = file;
     videoURL = URL.createObjectURL(file);
 
@@ -399,9 +407,20 @@ function initVideoUpload() {
       name.textContent = `${file.name} · ${formatFileSize(file.size)}`;
     }
 
-    if (analyze) analyze.disabled = true;
+    // FIX: Enable Analyze Video after valid video selection.
+    if (analyze) {
+      analyze.disabled = false;
+      analyze.removeAttribute("aria-disabled");
+      analyze.title = "Inspect the selected video's frames.";
+    }
 
     hideStatus();
+
+    const results = document.getElementById("results-section");
+    const content = document.getElementById("results-content");
+
+    if (results) results.hidden = true;
+    if (content) content.replaceChildren();
   }
 
   input.addEventListener("change", () => {
@@ -505,13 +524,15 @@ function initAnalysisButtons() {
     imageButton.title = "Analyze the selected image on your device.";
   }
 
-  // These engines are not integrated yet.
+  // Video button stays disabled until a valid video is selected.
+  // initVideoUpload() enables it after successful validation.
   if (videoButton) {
-    videoButton.disabled = true;
-    videoButton.setAttribute("aria-disabled", "true");
-    videoButton.title = "Video detection engine is not integrated yet.";
+    videoButton.disabled = !selectedVideo;
+    videoButton.removeAttribute("aria-disabled");
+    videoButton.title = "Inspect the selected video's frames.";
   }
 
+  // Writing detection will be connected separately.
   if (writingButton) {
     writingButton.disabled = true;
     writingButton.setAttribute("aria-disabled", "true");
