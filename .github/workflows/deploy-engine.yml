@@ -8,11 +8,18 @@ on:
       - "index.html"
       - "style.css"
       - "script.js"
+      - "image-engine.js"
+      - "video-engine.js"
+      - "video-ui.js"
+      - "writing-engine.js"
+      - "writing-ui.js"
       - "assets/**"
       - "ai-engine/**"
       - ".github/workflows/deploy-engine.yml"
       - "manifest.json"
       - "sw.js"
+      - "privacy.html"
+      - "terms.html"
 
   workflow_dispatch:
 
@@ -67,13 +74,18 @@ jobs:
 
       - name: Verify deployment files
         run: |
-          echo "Checking engine deployment files..."
-          test -f _site/engine/index.html
-          echo "Engine HTML found."
-          find _site/engine -maxdepth 3 -type f -print
           echo "Checking main website..."
           test -f _site/index.html
-          echo "Main website found."
+
+          echo "Checking video engine files..."
+          test -f _site/video-engine.js
+          test -f _site/video-ui.js
+
+          echo "Checking AI engine deployment..."
+          test -f _site/engine/index.html
+
+          echo "All required deployment files found."
+          find _site -maxdepth 3 -type f -print
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
