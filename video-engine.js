@@ -2,24 +2,25 @@
 
 /* =========================================
    I FIND AI — DEEPFAKE FRAME SCREENING
-   Model: Deep-Fake-Detector-v2-Model-ONNX
-   Runtime: Transformers.js / ONNX
+   Q4 Quantized ONNX Model
    ========================================= */
 
 const VideoEngine = (() => {
-  const CONFIG = {
+  const CONFIG = Object.freeze({
     model: "onnx-community/Deep-Fake-Detector-v2-Model-ONNX",
     maxFileSize: 100 * 1024 * 1024,
     maxDuration: 300,
     maxFrames: 12,
     sampleInterval: 1,
     frameWidth: 320
-  };
+  });
 
   let classifierPromise = null;
   let activeVideo = null;
   let activeURL = null;
   let cancelled = false;
+
+  /* FILE VALIDATION */
 
   function validateFile(file) {
     if (!(file instanceof File)) {
@@ -37,6 +38,8 @@ const VideoEngine = (() => {
     return true;
   }
 
+  /* RESOURCE CLEANUP */
+
   function releaseVideo() {
     if (activeVideo) {
       activeVideo.pause();
@@ -51,13 +54,15 @@ const VideoEngine = (() => {
     }
   }
 
+  /* LOAD Q4 CLASSIFIER */
+
   async function loadClassifier(onProgress) {
     if (!classifierPromise) {
       classifierPromise = (async () => {
         if (typeof onProgress === "function") {
           onProgress({
             stage: "model-loading",
-            message: "Loading deepfake detection model..."
+            message: "Loading optimized Q4 deepfake model..."
           });
         }
 
@@ -71,19 +76,34 @@ const VideoEngine = (() => {
           "image-classification",
           CONFIG.model,
           {
-            device: "wasm"
+            device: "wasm",
+            dtype: "q4",
+            progress_callback: (progress) => {
+              if (typeof onProgress === "function") {
+                onProgress({
+                  stage: "model-download",
+                  progress
+                });
+              }
+            }
           }
         );
 
         return model;
       })().catch((error) => {
         classifierPromise = null;
-        throw error;
+        console.error("Deepfake model loading failed:", error);
+
+        throw new Error(
+          "Deepfake model could not load. Check your internet connection or model compatibility and try again."
+        );
       });
     }
 
     return classifierPromise;
   }
+
+  /* LOAD VIDEO */
 
   function loadVideo(file) {
     return new Promise((resolve, reject) => {
@@ -129,6 +149,8 @@ const VideoEngine = (() => {
     });
   }
 
+  /* SEEK TO FRAME */
+
   function seekTo(video, time) {
     return new Promise((resolve, reject) => {
       let finished = false;
@@ -145,9 +167,12 @@ const VideoEngine = (() => {
 
       function finish(error) {
         if (finished) return;
+
         finished = true;
         cleanup();
-        error ? reject(error) : resolve();
+
+        if (error) reject(error);
+        else resolve();
       }
 
       function onSeeked() {
@@ -169,6 +194,8 @@ const VideoEngine = (() => {
     });
   }
 
+  /* FRAME SAMPLING */
+
   function sampleTimes(duration) {
     const count = Math.min(
       CONFIG.maxFrames,
@@ -178,9 +205,13 @@ const VideoEngine = (() => {
     const lastTime = Math.max(0, duration - 0.05);
 
     return Array.from({ length: count }, (_, index) =>
-      Number((lastTime * index / (count - 1)).toFixed(3))
+      Number(
+        (lastTime * index / (count - 1)).toFixed(3)
+      )
     );
   }
+
+  /* CREATE FRAME */
 
   function makeFrameCanvas(video) {
     const scale = Math.min(
@@ -189,8 +220,16 @@ const VideoEngine = (() => {
     );
 
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+
+    canvas.width = Math.max(
+      1,
+      Math.round(video.videoWidth * scale)
+    );
+
+    canvas.height = Math.max(
+      1,
+      Math.round(video.videoHeight * scale)
+    );
 
     const context = canvas.getContext("2d");
 
@@ -198,10 +237,18 @@ const VideoEngine = (() => {
       throw new Error("Canvas processing is unavailable.");
     }
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
 
     return canvas;
   }
+
+  /* MODEL OUTPUT INTERPRETATION */
 
   function interpretPrediction(predictions) {
     const normalized = predictions.map((item) => ({
@@ -227,12 +274,17 @@ const VideoEngine = (() => {
     }
 
     return {
-      status: fake.score > real.score ? "deepfake-like" : "real-like",
+      status:
+        fake.score > real.score
+          ? "deepfake-like"
+          : "real-like",
       fakeScore: fake.score,
       realScore: real.score,
       predictions: normalized
     };
   }
+
+  /* MAIN ANALYSIS */
 
   async function analyze(file, onProgress) {
     cancelled = false;
@@ -269,16 +321,8 @@ const VideoEngine = (() => {
         const canvas = makeFrameCanvas(video);
         const imageData = canvas.toDataURL("image/jpeg", 0.85);
 
-        if (typeof onProgress === "function") {
-          onProgress({
-            stage: "frame-analysis",
-            completed: index,
-            total: times.length,
-            percentage: Math.round(index / times.length * 100)
-          });
-        }
-
         const predictions = await classifier(imageData);
+
         const result = interpretPrediction(predictions);
 
         frameResults.push({
@@ -293,14 +337,14 @@ const VideoEngine = (() => {
             completed: index + 1,
             total: times.length,
             percentage: Math.round(
-              (index + 1) / times.length * 100
+              ((index + 1) / times.length) * 100
             )
           });
         }
 
-        await new Promise((resolve) =>
-          requestAnimationFrame(resolve)
-        );
+        await new Promise((resolve) => {
+          requestAnimationFrame(resolve);
+        });
       }
 
       const validFrames = frameResults.filter(
@@ -309,7 +353,8 @@ const VideoEngine = (() => {
 
       const averageFakeScore = validFrames.length
         ? validFrames.reduce(
-            (sum, frame) => sum + frame.fakeScore, 0
+            (sum, frame) => sum + frame.fakeScore,
+            0
           ) / validFrames.length
         : null;
 
@@ -320,9 +365,12 @@ const VideoEngine = (() => {
       let verdict = "inconclusive";
 
       if (validFrames.length) {
-        if (deepfakeLikeFrames / validFrames.length >= 0.7) {
+        const ratio =
+          deepfakeLikeFrames / validFrames.length;
+
+        if (ratio >= 0.7) {
           verdict = "deepfake-like-signals";
-        } else if (deepfakeLikeFrames / validFrames.length <= 0.3) {
+        } else if (ratio <= 0.3) {
           verdict = "real-like-signals";
         }
       }
@@ -355,6 +403,7 @@ const VideoEngine = (() => {
           completed: true,
           model: CONFIG.model,
           modelType: "image-classifier-applied-to-video-frames",
+          quantization: "q4",
           extractedFrames: frameResults.length,
           analyzedFrames: validFrames.length,
           deepfakeLikeFrames,
@@ -364,14 +413,13 @@ const VideoEngine = (() => {
               : Number(averageFakeScore.toFixed(4)),
           verdict,
           message:
-            "Frame-level model screening completed. This is not a validated temporal video deepfake verdict."
+            "Frame-level screening completed. This is not a validated temporal video deepfake verdict."
         },
 
         privacy: {
           processing: "browser-local",
           videoUploadedToServer: false,
-          permanentlyStored: false,
-          modelDownloadedFrom: "Hugging Face"
+          permanentlyStored: false
         }
       };
 
@@ -392,3 +440,4 @@ const VideoEngine = (() => {
 })();
 
 window.IFindAIVideoEngine = VideoEngine;
+
