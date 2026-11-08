@@ -4,14 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>I FIND AI — Engine Build</title>
+  <meta name="theme-color" content="#080d20">
+  <title>I FIND AI — Image Detection Engine</title>
 </head>
 <body>
   <main>
-    <h1>I FIND AI Engine</h1>
-    <p>Browser-based image detection engine build entry.</p>
-    <p id="engine-status" role="status">Engine bundle is not connected yet.</p>
+    <h1>I FIND AI</h1>
+    <p>AI Image Detection Engine</p>
+    <p id="engine-status" role="status" aria-live="polite">
+      Starting detection engine...
+    </p>
   </main>
-  <script type="module" src="/src/main.js"></script>
+
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
