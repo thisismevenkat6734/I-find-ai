@@ -1,32 +1,28 @@
 "use strict";
 
-/*
- * I FIND AI — Video Analysis Engine
- * Browser-only video inspection.
- *
- * This module:
- * 1. Validates video files.
- * 2. Reads video metadata.
- * 3. Extracts 12 evenly-spaced frames.
- * 4. Computes frame hashes and visual statistics.
- * 5. Reports observable video signals.
- *
- * It does NOT claim to detect deepfakes without
- * a validated video classification model.
- */
+/* =========================================
+   I FIND AI — VIDEO INSPECTION ENGINE
+   Version: 2.0
+   Browser-local frame extraction
+   ========================================= */
 
 const VideoEngine = (() => {
-  const CONFIG = {
+  const CONFIG = Object.freeze({
     maxFileSize: 100 * 1024 * 1024,
     maxDuration: 300,
     maxFrames: 12,
+    sampleIntervalSeconds: 1,
     frameWidth: 320,
-    frameInterval: 500
-  };
+    seekTimeout: 10000
+  });
 
   let activeVideo = null;
   let activeObjectUrl = null;
   let cancelled = false;
+
+  /* =======================================
+     1. FILE VALIDATION
+     ======================================= */
 
   function validateFile(file) {
     if (!(file instanceof File)) {
@@ -40,23 +36,47 @@ const VideoEngine = (() => {
       "video/x-m4v"
     ];
 
-    if (
-      !allowedTypes.includes(file.type) &&
-      !/\.(mp4|webm|mov|m4v)$/i.test(file.name)
-    ) {
-      throw new Error("Supported formats: MP4, WebM, MOV and M4V.");
-    }
+    const validExtension =
+      /\.(mp4|webm|mov|m4v)$/i.test(file.name);
 
-    if (file.size > CONFIG.maxFileSize) {
-      throw new Error("Video size must be 100 MB or less.");
+    if (!allowedTypes.includes(file.type) && !validExtension) {
+      throw new Error(
+        "Supported formats: MP4, WebM, MOV and M4V."
+      );
     }
 
     if (file.size === 0) {
       throw new Error("The selected video is empty.");
     }
 
+    if (file.size > CONFIG.maxFileSize) {
+      throw new Error("Video size must be 100 MB or less.");
+    }
+
     return true;
   }
+
+  /* =======================================
+     2. RELEASE RESOURCES
+     ======================================= */
+
+  function release() {
+    if (activeVideo) {
+      activeVideo.pause();
+      activeVideo.removeAttribute("src");
+      activeVideo.load();
+      activeVideo = null;
+    }
+
+    if (activeObjectUrl) {
+      URL.revokeObjectURL(activeObjectUrl);
+      activeObjectUrl = null;
+    }
+  }
+
+  /* =======================================
+     3. LOAD VIDEO METADATA
+     ======================================= */
 
   function loadVideo(file) {
     return new Promise((resolve, reject) => {
@@ -70,10 +90,10 @@ const VideoEngine = (() => {
       video.muted = true;
       video.playsInline = true;
 
-      const cleanup = () => {
+      function cleanup() {
         video.onloadedmetadata = null;
         video.onerror = null;
-      };
+      }
 
       video.onloadedmetadata = () => {
         cleanup();
@@ -94,7 +114,9 @@ const VideoEngine = (() => {
         }
 
         if (!video.videoWidth || !video.videoHeight) {
-          reject(new Error("Video dimensions could not be read."));
+          reject(
+            new Error("Video dimensions could not be read.")
+          );
           return;
         }
 
@@ -103,6 +125,7 @@ const VideoEngine = (() => {
 
       video.onerror = () => {
         cleanup();
+
         reject(
           new Error("Unable to read this video. Try another file.")
         );
@@ -112,40 +135,66 @@ const VideoEngine = (() => {
     });
   }
 
+  /* =======================================
+     4. VIDEO SEEK
+     ======================================= */
+
   function seekTo(video, time) {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        cleanup();
-        reject(new Error("Video frame extraction timed out."));
-      }, 10000);
+      let settled = false;
 
-      const cleanup = () => {
-        clearTimeout(timeout);
+      const timeout = window.setTimeout(() => {
+        finish(
+          new Error("Video frame extraction timed out.")
+        );
+      }, CONFIG.seekTimeout);
+
+      function cleanup() {
+        window.clearTimeout(timeout);
+
         video.removeEventListener("seeked", onSeeked);
         video.removeEventListener("error", onError);
-      };
+      }
 
-      const onSeeked = () => {
+      function finish(error) {
+        if (settled) return;
+
+        settled = true;
         cleanup();
-        resolve();
-      };
 
-      const onError = () => {
-        cleanup();
-        reject(new Error("Unable to decode a video frame."));
-      };
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      }
 
-      video.addEventListener("seeked", onSeeked, {
-        once: true
-      });
+      function onSeeked() {
+        finish();
+      }
 
-      video.addEventListener("error", onError, {
-        once: true
-      });
+      function onError() {
+        finish(
+          new Error("Unable to decode a video frame.")
+        );
+      }
 
-      video.currentTime = time;
+      video.addEventListener("seeked", onSeeked);
+      video.addEventListener("error", onError);
+
+      try {
+        video.currentTime = time;
+      } catch (error) {
+        finish(
+          new Error("Unable to seek to the requested video frame.")
+        );
+      }
     });
   }
+
+  /* =======================================
+     5. FRAME EXTRACTION
+     ======================================= */
 
   function extractFrame(video, time) {
     const scale = Math.min(
@@ -193,18 +242,30 @@ const VideoEngine = (() => {
     };
   }
 
+  /* =======================================
+     6. FRAME HASH
+     ======================================= */
+
   async function hashFrame(frame) {
-    const data = frame.pixels.data;
+    if (!crypto.subtle) {
+      throw new Error(
+        "Secure browser cryptography is unavailable."
+      );
+    }
 
     const digest = await crypto.subtle.digest(
       "SHA-256",
-      data
+      frame.pixels.data
     );
 
     return Array.from(new Uint8Array(digest))
       .map((value) => value.toString(16).padStart(2, "0"))
       .join("");
   }
+
+  /* =======================================
+     7. FRAME STATISTICS
+     ======================================= */
 
   function calculateStatistics(frame) {
     const data = frame.pixels.data;
@@ -244,29 +305,64 @@ const VideoEngine = (() => {
     };
   }
 
-  async function extractFrames(video, onProgress) {
-    const duration = video.duration;
+  /* =======================================
+     8. CALCULATE SAMPLE TIMES
+     ======================================= */
+
+  function calculateSampleTimes(duration) {
+    const desiredFrames =
+      Math.ceil(duration / CONFIG.sampleIntervalSeconds);
 
     const frameCount = Math.min(
       CONFIG.maxFrames,
-      Math.max(2, Math.ceil(duration / CONFIG.frameInterval))
+      Math.max(2, desiredFrames)
     );
+
+    const lastSafeTime = Math.max(
+      0,
+      duration - 0.05
+    );
+
+    const times = [];
+
+    for (let i = 0; i < frameCount; i++) {
+      const time =
+        frameCount === 1
+          ? 0
+          : (lastSafeTime * i) / (frameCount - 1);
+
+      times.push(Number(time.toFixed(3)));
+    }
+
+    return times;
+  }
+
+  /* =======================================
+     9. EXTRACT ALL SAMPLED FRAMES
+     ======================================= */
+
+  async function extractFrames(video, onProgress) {
+    const times = calculateSampleTimes(video.duration);
 
     const frames = [];
 
-    for (let i = 0; i < frameCount; i++) {
+    for (let i = 0; i < times.length; i++) {
       if (cancelled) {
         throw new Error("Video analysis cancelled.");
       }
 
-      const time =
-        frameCount === 1
-          ? 0
-          : (duration * i) / (frameCount - 1);
+      const time = times[i];
 
-      await seekTo(video, Math.min(time, duration - 0.05));
+      await seekTo(video, time);
 
-      const frame = extractFrame(video, video.currentTime);
+      if (cancelled) {
+        throw new Error("Video analysis cancelled.");
+      }
+
+      const frame = extractFrame(
+        video,
+        video.currentTime
+      );
 
       frame.hash = await hashFrame(frame);
       frame.statistics = calculateStatistics(frame);
@@ -276,34 +372,24 @@ const VideoEngine = (() => {
       if (typeof onProgress === "function") {
         onProgress({
           completed: i + 1,
-          total: frameCount,
+          total: times.length,
           percentage: Math.round(
-            ((i + 1) / frameCount) * 100
+            ((i + 1) / times.length) * 100
           )
         });
       }
 
-      await new Promise((resolve) =>
-        requestAnimationFrame(resolve)
-      );
+      await new Promise((resolve) => {
+        requestAnimationFrame(resolve);
+      });
     }
 
     return frames;
   }
 
-  function release() {
-    if (activeVideo) {
-      activeVideo.pause();
-      activeVideo.removeAttribute("src");
-      activeVideo.load();
-      activeVideo = null;
-    }
-
-    if (activeObjectUrl) {
-      URL.revokeObjectURL(activeObjectUrl);
-      activeObjectUrl = null;
-    }
-  }
+  /* =======================================
+     10. MAIN ANALYSIS
+     ======================================= */
 
   async function analyze(file, onProgress) {
     cancelled = false;
@@ -340,6 +426,10 @@ const VideoEngine = (() => {
         }
       );
 
+      if (cancelled) {
+        throw new Error("Video analysis cancelled.");
+      }
+
       const report = {
         file: {
           name: file.name,
@@ -356,7 +446,8 @@ const VideoEngine = (() => {
           )
         },
 
-        frames: frames.map((frame) => ({
+        frames: frames.map((frame, index) => ({
+          frameNumber: index + 1,
           timestamp: Number(frame.time.toFixed(2)),
           width: frame.width,
           height: frame.height,
@@ -370,7 +461,7 @@ const VideoEngine = (() => {
           deepfakeModelAvailable: false,
           verdict: "not-analyzed",
           message:
-            "Frames extracted successfully. A validated AI video detection model is not connected yet."
+            "Frame inspection completed. A validated AI video detection model is not connected yet."
         },
 
         privacy: {
@@ -380,20 +471,36 @@ const VideoEngine = (() => {
         }
       };
 
-      release();
+      if (typeof onProgress === "function") {
+        onProgress({
+          stage: "completed",
+          percentage: 100,
+          completed: frames.length,
+          total: frames.length
+        });
+      }
 
       return report;
 
     } catch (error) {
-      release();
       throw error;
+
+    } finally {
+      release();
     }
   }
 
+  /* =======================================
+     11. CANCEL
+     ======================================= */
+
   function cancel() {
     cancelled = true;
-    release();
   }
+
+  /* =======================================
+     12. PUBLIC API
+     ======================================= */
 
   return Object.freeze({
     analyze,
