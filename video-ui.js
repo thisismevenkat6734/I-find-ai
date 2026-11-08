@@ -1,215 +1,281 @@
 "use strict";
 
 (() => {
-  const engine = window.IFindAIVideoEngine;
-
-  if (!engine) {
-    console.error("I FIND AI Video Engine is not loaded.");
-    return;
-  }
-
   const $ = (id) => document.getElementById(id);
 
-  const input = $("video-file");
-  const preview = $("video-preview");
-  const player = $("video-preview-player");
-  const fileName = $("video-file-name");
-  const removeButton = $("remove-video");
-  const analyzeButton = $("analyze-video");
-  const uploadArea = $("video-upload-area");
+  function initializeVideoUI() {
+    const input = $("video-file");
+    const preview = $("video-preview");
+    const player = $("video-preview-player");
+    const fileName = $("video-file-name");
+    const removeButton = $("remove-video");
+    const analyzeButton = $("analyze-video");
+    const uploadArea = $("video-upload-area");
 
-  const status = $("analysis-status");
-  const message = $("analysis-message");
-  const results = $("results-section");
-  const resultsContent = $("results-content");
+    const status = $("analysis-status");
+    const statusMessage = $("analysis-message");
+    const results = $("results-section");
+    const resultsContent = $("results-content");
 
-  if (
-    !input ||
-    !preview ||
-    !player ||
-    !analyzeButton ||
-    !status ||
-    !results ||
-    !resultsContent
-  ) {
-    console.error("Required video interface elements are missing.");
-    return;
-  }
-
-  let selectedFile = null;
-  let busy = false;
-  let previewUrl = null;
-
-  function setStatus(text, visible = true) {
-    message.textContent = text;
-    status.hidden = !visible;
-  }
-
-  function releasePreview() {
-    player.pause();
-    player.removeAttribute("src");
-    player.load();
-
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      previewUrl = null;
+    if (!input || !analyzeButton) {
+      console.error("I FIND AI: Video elements not found.");
+      return;
     }
-  }
 
-  function clearResults() {
-    results.hidden = true;
-    resultsContent.replaceChildren();
-  }
+    const engine = window.IFindAIVideoEngine;
+    let selectedFile = null;
+    let previewUrl = null;
+    let analyzing = false;
 
-  function removeVideo() {
-    if (busy) return;
-
-    selectedFile = null;
-    input.value = "";
-
-    releasePreview();
-
-    preview.hidden = true;
-    uploadArea.hidden = false;
     analyzeButton.disabled = true;
 
-    fileName.textContent = "";
-    setStatus("", false);
-    clearResults();
-  }
+    function showStatus(message) {
+      if (status) {
+        status.hidden = false;
+        if (statusMessage) statusMessage.textContent = message;
+      }
+    }
 
-  function selectVideo(file) {
-    if (!file) return;
+    function hideStatus() {
+      if (status) status.hidden = true;
+    }
 
-    try {
-      engine.validateFile(file);
+    function clearResults() {
+      if (results) results.hidden = true;
+      if (resultsContent) resultsContent.replaceChildren();
+    }
 
-      selectedFile = file;
+    function showError(message) {
+      showStatus(message);
+      if (statusMessage) statusMessage.textContent = message;
+    }
+
+    function releasePreview() {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+    }
+
+    function resetVideo() {
+      selectedFile = null;
+      analyzing = false;
 
       releasePreview();
 
-      previewUrl = URL.createObjectURL(file);
-      player.src = previewUrl;
+      if (player) {
+        player.pause();
+        player.removeAttribute("src");
+        player.load();
+      }
 
-      fileName.textContent =
-        `${file.name} (${(file.size / 1048576).toFixed(2)} MB)`;
+      if (input) input.value = "";
 
-      preview.hidden = false;
-      uploadArea.hidden = true;
+      if (preview) preview.hidden = true;
+      if (uploadArea) uploadArea.hidden = false;
 
-      analyzeButton.disabled = false;
-
-      clearResults();
-      setStatus("", false);
-
-    } catch (error) {
-      selectedFile = null;
-      input.value = "";
+      if (fileName) fileName.textContent = "";
 
       analyzeButton.disabled = true;
-      setStatus(error.message);
+      analyzeButton.classList.remove("loading");
+
+      hideStatus();
+      clearResults();
     }
-  }
 
-  function addResult(title, value) {
-    const item = document.createElement("p");
-    const strong = document.createElement("strong");
+    function validateSelectedFile(file) {
+      if (!file) {
+        throw new Error("Please select a video.");
+      }
 
-    strong.textContent = `${title}: `;
-    item.append(strong, document.createTextNode(String(value)));
+      const allowedTypes = [
+        "video/mp4",
+        "video/webm",
+        "video/quicktime",
+        "video/x-m4v"
+      ];
 
-    resultsContent.appendChild(item);
-  }
+      const validExtension =
+        /\.(mp4|webm|mov|m4v)$/i.test(file.name);
 
-  function displayReport(report) {
-    resultsContent.replaceChildren();
+      if (!allowedTypes.includes(file.type) && !validExtension) {
+        throw new Error("Please select MP4, WebM or MOV video.");
+      }
 
-    const heading = document.createElement("h3");
-    heading.textContent = "Video Inspection Report";
+      if (file.size === 0) {
+        throw new Error("The selected video is empty.");
+      }
 
-    resultsContent.appendChild(heading);
+      if (file.size > 100 * 1024 * 1024) {
+        throw new Error("Video size must be 100 MB or less.");
+      }
 
-    addResult("File", report.file.name);
-    addResult("Duration", `${report.video.duration} seconds`);
+      if (engine && typeof engine.validateFile === "function") {
+        engine.validateFile(file);
+      }
 
-    addResult(
-      "Resolution",
-      `${report.video.width} × ${report.video.height}`
-    );
+      return true;
+    }
 
-    addResult(
-      "Frames inspected",
-      report.analysis.extractedFrames
-    );
+    function handleFileSelection() {
+      const file = input.files && input.files[0];
 
-    addResult(
-      "Deepfake detection model",
-      "Not connected"
-    );
+      if (!file) {
+        resetVideo();
+        return;
+      }
 
-    const notice = document.createElement("p");
-    notice.textContent = report.analysis.message;
+      try {
+        validateSelectedFile(file);
 
-    resultsContent.appendChild(notice);
+        releasePreview();
 
-    const warning = document.createElement("p");
-    warning.textContent =
-      "Frame extraction and image statistics do not prove whether a video is AI-generated or manipulated.";
+        selectedFile = file;
+        previewUrl = URL.createObjectURL(file);
 
-    resultsContent.appendChild(warning);
-
-    results.hidden = false;
-  }
-
-  input.addEventListener("change", () => {
-    selectVideo(input.files?.[0]);
-  });
-
-  removeButton?.addEventListener("click", removeVideo);
-
-  analyzeButton.addEventListener("click", async () => {
-    if (!selectedFile || busy) return;
-
-    busy = true;
-
-    analyzeButton.disabled = true;
-    input.disabled = true;
-
-    clearResults();
-
-    try {
-      const report = await engine.analyze(
-        selectedFile,
-        (progress) => {
-          if (progress.stage === "metadata") {
-            setStatus("Reading video information...");
-            return;
-          }
-
-          setStatus(
-            `Extracting video frames: ${progress.completed}/${progress.total} (${progress.percentage}%)`
-          );
+        if (player) {
+          player.src = previewUrl;
+          player.load();
         }
-      );
 
-      displayReport(report);
-      setStatus("Video inspection completed.");
+        if (fileName) {
+          fileName.textContent =
+            file.name + " (" +
+            (file.size / (1024 * 1024)).toFixed(2) +
+            " MB)";
+        }
 
-    } catch (error) {
-      console.error("Video inspection failed:", error);
-      setStatus(error.message || "Video inspection failed.");
+        if (preview) preview.hidden = false;
+        if (uploadArea) uploadArea.hidden = true;
 
-    } finally {
-      busy = false;
+        clearResults();
+        hideStatus();
 
-      input.disabled = false;
-      analyzeButton.disabled = !selectedFile;
+        // Enable after other change handlers have completed.
+        queueMicrotask(() => {
+          if (selectedFile === file && !analyzing) {
+            analyzeButton.disabled = false;
+          }
+        });
+
+      } catch (error) {
+        resetVideo();
+        showError(error.message || "Unable to select this video.");
+      }
     }
-  });
 
-  window.addEventListener("beforeunload", () => {
-    releasePreview();
-  });
+    function addResult(label, value) {
+      const row = document.createElement("p");
+      const heading = document.createElement("strong");
 
-  console.info("I FIND AI Video UI initialized.");
+      heading.textContent = label + ": ";
+      row.appendChild(heading);
+      row.appendChild(document.createTextNode(String(value)));
+
+      resultsContent.appendChild(row);
+    }
+
+    function displayReport(report) {
+      if (!results || !resultsContent) return;
+
+      resultsContent.replaceChildren();
+
+      const heading = document.createElement("h3");
+      heading.textContent = "Video Inspection Report";
+      resultsContent.appendChild(heading);
+
+      addResult("File", report.file.name);
+      addResult("Duration", report.video.duration + " seconds");
+      addResult(
+        "Resolution",
+        report.video.width + " × " + report.video.height
+      );
+      addResult("Frames inspected", report.analysis.extractedFrames);
+
+      const notice = document.createElement("p");
+      notice.textContent =
+        "Frame extraction completed. An AI deepfake detection model " +
+        "is not connected yet, so this report does not determine " +
+        "whether the video is AI-generated or manipulated.";
+
+      resultsContent.appendChild(notice);
+
+      results.hidden = false;
+    }
+
+    async function analyzeVideo() {
+      if (analyzing) return;
+
+      if (!selectedFile) {
+        showError("Please select a video first.");
+        return;
+      }
+
+      if (!engine || typeof engine.analyze !== "function") {
+        showError(
+          "Video engine could not load. Please refresh the page and try again."
+        );
+        return;
+      }
+
+      analyzing = true;
+      analyzeButton.disabled = true;
+      analyzeButton.classList.add("loading");
+
+      clearResults();
+
+      try {
+        showStatus("Preparing video analysis...");
+
+        const report = await engine.analyze(
+          selectedFile,
+          (progress) => {
+            if (!statusMessage) return;
+
+            if (progress.stage === "metadata") {
+              statusMessage.textContent = "Reading video information...";
+            } else if (progress.stage === "frame-extraction") {
+              statusMessage.textContent =
+                "Inspecting frames: " +
+                progress.completed + " / " +
+                progress.total;
+            }
+          }
+        );
+
+        displayReport(report);
+        showStatus(
+          "Frame extraction completed. AI deepfake detection is not yet available."
+        );
+
+      } catch (error) {
+        showError(error.message || "Video analysis failed.");
+
+      } finally {
+        analyzing = false;
+        analyzeButton.disabled = !selectedFile;
+        analyzeButton.classList.remove("loading");
+      }
+    }
+
+    input.addEventListener("change", handleFileSelection, true);
+
+    analyzeButton.addEventListener("click", analyzeVideo);
+
+    if (removeButton) {
+      removeButton.addEventListener("click", resetVideo);
+    }
+
+    window.addEventListener("beforeunload", releasePreview);
+
+    console.log("I FIND AI Video UI initialized.");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeVideoUI, {
+      once: true
+    });
+  } else {
+    initializeVideoUI();
+  }
 })();
