@@ -2,7 +2,8 @@
 
 /* =========================================
    I FIND AI — MAIN JAVASCRIPT
-   Version: 2.3
+   Version: 2.4
+   Image + Video + Writing integration
    ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -11,16 +12,12 @@ document.addEventListener("DOMContentLoaded", () => {
   initDetectorTabs();
   initImageUpload();
   initVideoUpload();
-  initWritingDetector();
-  initAnalysisButtons();
   initFooterYear();
   initAccessibility();
   registerServiceWorker();
 });
 
-/* =========================================
-   1. WELCOME SCREEN
-   ========================================= */
+/* 1. WELCOME SCREEN */
 
 function initWelcomeScreen() {
   const screen = document.getElementById("welcome-screen");
@@ -44,8 +41,6 @@ function initWelcomeScreen() {
     "(prefers-reduced-motion: reduce)"
   ).matches;
 
-  const duration = reducedMotion ? 1000 : 5000;
-
   window.setTimeout(() => {
     screen.classList.add("is-leaving");
 
@@ -53,25 +48,16 @@ function initWelcomeScreen() {
       screen.hidden = true;
       main.classList.remove("is-hidden");
     }, reducedMotion ? 100 : 700);
-  }, duration);
+  }, reducedMotion ? 1000 : 5000);
 }
 
-/* =========================================
-   2. MOBILE NAVIGATION
-   ========================================= */
+/* 2. MOBILE NAVIGATION */
 
 function initMobileNavigation() {
   const button = document.getElementById("mobile-menu-button");
   const nav = document.querySelector(".main-navigation");
 
   if (!button || !nav) return;
-
-  function openMenu() {
-    nav.classList.add("is-open");
-    button.classList.add("is-active");
-    button.setAttribute("aria-expanded", "true");
-    button.setAttribute("aria-label", "Close navigation");
-  }
 
   function closeMenu() {
     nav.classList.remove("is-open");
@@ -83,9 +69,14 @@ function initMobileNavigation() {
   button.addEventListener("click", (event) => {
     event.stopPropagation();
 
-    nav.classList.contains("is-open")
-      ? closeMenu()
-      : openMenu();
+    if (nav.classList.contains("is-open")) {
+      closeMenu();
+    } else {
+      nav.classList.add("is-open");
+      button.classList.add("is-active");
+      button.setAttribute("aria-expanded", "true");
+      button.setAttribute("aria-label", "Close navigation");
+    }
   });
 
   nav.querySelectorAll("a").forEach((link) => {
@@ -107,9 +98,7 @@ function initMobileNavigation() {
   });
 }
 
-/* =========================================
-   3. DETECTOR TABS
-   ========================================= */
+/* 3. DETECTOR TABS */
 
 function initDetectorTabs() {
   const tabs = document.querySelectorAll("[data-mode]");
@@ -124,7 +113,6 @@ function initDetectorTabs() {
 
     tabs.forEach((tab) => {
       const active = tab === selected;
-
       tab.classList.toggle("active", active);
       tab.setAttribute("aria-selected", String(active));
       tab.setAttribute("tabindex", active ? "0" : "-1");
@@ -132,7 +120,6 @@ function initDetectorTabs() {
 
     panels.forEach((panel) => {
       const active = panel.id === `panel-${mode}`;
-
       panel.classList.toggle("active", active);
       panel.hidden = !active;
     });
@@ -158,18 +145,16 @@ function initDetectorTabs() {
     });
   });
 
-  const activeTab = document.querySelector("[data-mode].active");
-  activateTab(activeTab || tabs[0]);
+  activateTab(
+    document.querySelector("[data-mode].active") || tabs[0]
+  );
 }
 
-/* =========================================
-   4. FILE SETTINGS
-   ========================================= */
+/* 4. FILE SETTINGS */
 
 const FILE_LIMITS = {
   image: 15 * 1024 * 1024,
-  video: 100 * 1024 * 1024,
-  text: 10000
+  video: 100 * 1024 * 1024
 };
 
 const ALLOWED_IMAGES = [
@@ -191,9 +176,7 @@ let selectedVideo = null;
 let imageURL = null;
 let videoURL = null;
 
-/* =========================================
-   5. STATUS MESSAGES
-   ========================================= */
+/* 5. STATUS MESSAGES */
 
 function showStatus(message, type = "info") {
   const status = document.getElementById("analysis-status");
@@ -236,9 +219,7 @@ function releaseURL(type) {
   }
 }
 
-/* =========================================
-   6. IMAGE UPLOAD — ENGINE CONNECTED
-   ========================================= */
+/* 6. IMAGE UPLOAD */
 
 function initImageUpload() {
   const input = document.getElementById("image-file");
@@ -258,16 +239,10 @@ function initImageUpload() {
     if (image) image.removeAttribute("src");
     if (preview) preview.hidden = true;
     if (name) name.textContent = "";
-
     if (analyze) analyze.disabled = true;
 
     hideStatus();
-
-    const results = document.getElementById("results-section");
-    const content = document.getElementById("results-content");
-
-    if (results) results.hidden = true;
-    if (content) content.replaceChildren();
+    clearResults();
   }
 
   function handleImage(file) {
@@ -304,18 +279,14 @@ function initImageUpload() {
     if (preview) preview.hidden = false;
 
     if (name) {
-      name.textContent = `${file.name} · ${formatFileSize(file.size)}`;
+      name.textContent =
+        `${file.name} · ${formatFileSize(file.size)}`;
     }
 
     if (analyze) analyze.disabled = false;
 
     hideStatus();
-
-    const results = document.getElementById("results-section");
-    const content = document.getElementById("results-content");
-
-    if (results) results.hidden = true;
-    if (content) content.replaceChildren();
+    clearResults();
   }
 
   input.addEventListener("change", () => {
@@ -329,9 +300,7 @@ function initImageUpload() {
   setupDropZone(input, handleImage);
 }
 
-/* =========================================
-   7. VIDEO UPLOAD
-   ========================================= */
+/* 7. VIDEO UPLOAD */
 
 function initVideoUpload() {
   const input = document.getElementById("video-file");
@@ -357,22 +326,17 @@ function initVideoUpload() {
 
     if (preview) preview.hidden = true;
     if (name) name.textContent = "";
-
     if (analyze) analyze.disabled = true;
 
     hideStatus();
-
-    const results = document.getElementById("results-section");
-    const content = document.getElementById("results-content");
-
-    if (results) results.hidden = true;
-    if (content) content.replaceChildren();
+    clearResults();
   }
 
   function handleVideo(file) {
     if (!file) return;
 
-    const validExtension = /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+    const validExtension =
+      /\.(mp4|webm|mov|m4v)$/i.test(file.name);
 
     if (!ALLOWED_VIDEOS.includes(file.type) && !validExtension) {
       clearVideo();
@@ -380,13 +344,7 @@ function initVideoUpload() {
       return;
     }
 
-    if (file.size === 0) {
-      clearVideo();
-      showStatus("The selected video is empty.", "error");
-      return;
-    }
-
-    if (file.size > FILE_LIMITS.video) {
+    if (!file.size || file.size > FILE_LIMITS.video) {
       clearVideo();
       showStatus("Video size must not exceed 100 MB.", "error");
       return;
@@ -404,23 +362,18 @@ function initVideoUpload() {
     if (preview) preview.hidden = false;
 
     if (name) {
-      name.textContent = `${file.name} · ${formatFileSize(file.size)}`;
+      name.textContent =
+        `${file.name} · ${formatFileSize(file.size)}`;
     }
 
-    // FIX: Enable Analyze Video after valid video selection.
+    // Enable after valid video selection.
     if (analyze) {
       analyze.disabled = false;
       analyze.removeAttribute("aria-disabled");
-      analyze.title = "Inspect the selected video's frames.";
     }
 
     hideStatus();
-
-    const results = document.getElementById("results-section");
-    const content = document.getElementById("results-content");
-
-    if (results) results.hidden = true;
-    if (content) content.replaceChildren();
+    clearResults();
   }
 
   input.addEventListener("change", () => {
@@ -434,9 +387,7 @@ function initVideoUpload() {
   setupDropZone(input, handleVideo);
 }
 
-/* =========================================
-   8. DRAG AND DROP
-   ========================================= */
+/* 8. DRAG AND DROP */
 
 function setupDropZone(input, onSelect) {
   if (!input) return;
@@ -470,79 +421,17 @@ function setupDropZone(input, onSelect) {
   });
 }
 
-/* =========================================
-   9. WRITING INPUT
-   ========================================= */
+/* 9. RESULTS CLEANUP */
 
-function initWritingDetector() {
-  const textarea = document.getElementById("writing-input");
-  const counter = document.getElementById("character-count");
-  const clear = document.getElementById("clear-writing");
-  const analyze = document.getElementById("analyze-writing");
+function clearResults() {
+  const results = document.getElementById("results-section");
+  const content = document.getElementById("results-content");
 
-  if (!textarea) return;
-
-  textarea.maxLength = FILE_LIMITS.text;
-
-  function updateCounter() {
-    if (counter) {
-      counter.textContent =
-        `${textarea.value.length.toLocaleString()} / ${FILE_LIMITS.text.toLocaleString()}`;
-    }
-
-    if (analyze) analyze.disabled = true;
-  }
-
-  textarea.addEventListener("input", updateCounter);
-
-  if (clear) {
-    clear.addEventListener("click", () => {
-      textarea.value = "";
-      updateCounter();
-      hideStatus();
-      textarea.focus();
-    });
-  }
-
-  updateCounter();
+  if (results) results.hidden = true;
+  if (content) content.replaceChildren();
 }
 
-/* =========================================
-   10. DETECTION BUTTONS
-   ========================================= */
-
-function initAnalysisButtons() {
-  const imageButton = document.getElementById("analyze-image");
-  const videoButton = document.getElementById("analyze-video");
-  const writingButton = document.getElementById("analyze-writing");
-
-  // Image button is controlled by image upload selection.
-  // image-engine.js handles its click event.
-  if (imageButton) {
-    imageButton.disabled = !selectedImage;
-    imageButton.removeAttribute("aria-disabled");
-    imageButton.title = "Analyze the selected image on your device.";
-  }
-
-  // Video button stays disabled until a valid video is selected.
-  // initVideoUpload() enables it after successful validation.
-  if (videoButton) {
-    videoButton.disabled = !selectedVideo;
-    videoButton.removeAttribute("aria-disabled");
-    videoButton.title = "Inspect the selected video's frames.";
-  }
-
-  // Writing detection will be connected separately.
-  if (writingButton) {
-    writingButton.disabled = true;
-    writingButton.setAttribute("aria-disabled", "true");
-    writingButton.title = "Writing detection engine is not integrated yet.";
-  }
-}
-
-/* =========================================
-   11. FOOTER YEAR
-   ========================================= */
+/* 10. FOOTER YEAR */
 
 function initFooterYear() {
   const currentYear = String(new Date().getFullYear());
@@ -555,9 +444,7 @@ function initFooterYear() {
   });
 }
 
-/* =========================================
-   12. ACCESSIBILITY
-   ========================================= */
+/* 11. ACCESSIBILITY */
 
 function initAccessibility() {
   const menu = document.getElementById("mobile-menu-button");
@@ -578,15 +465,10 @@ function initAccessibility() {
   }
 }
 
-/* =========================================
-   13. SERVICE WORKER REGISTRATION
-   ========================================= */
+/* 12. SERVICE WORKER */
 
 function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) {
-    console.info("Service Workers are not supported in this browser.");
-    return;
-  }
+  if (!("serviceWorker" in navigator)) return;
 
   const serviceWorkerPath = "/I-find-ai/sw.js";
 
@@ -613,9 +495,7 @@ function registerServiceWorker() {
   });
 }
 
-/* =========================================
-   14. RESOURCE CLEANUP
-   ========================================= */
+/* 13. RESOURCE CLEANUP */
 
 window.addEventListener("beforeunload", () => {
   releaseURL("image");
