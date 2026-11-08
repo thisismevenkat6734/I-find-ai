@@ -1,335 +1,276 @@
 import * as ort from "onnxruntime-web";
 
-const MANIFEST_URL = "./model/model-manifest.json";
+import {
+  preprocessImage,
+  preprocessFit,
+  preprocessNative,
+  degradationStats,
+  degenerateReason
+} from "./preprocess.js";
 
-let session = null;
-let manifest = null;
-let modelBytes = null;
+const MANIFEST_URL = `${import.meta.env.BASE_URL}model/model-manifest.json`;
 
-const MODEL_PATH = "./model/sieve.onnx";
+let manifestPromise;
+let sessionPromise;
 
-function sigmoid(value) {
-  return 1 / (1 + Math.exp(-value));
+async function getManifest() {
+  if (!manifestPromise) {
+    manifestPromise = (async () => {
+      const response = await fetch(MANIFEST_URL, {
+        cache: "no-cache"
+      });
+
+      if (!response.ok) {
+        throw new Error("Model manifest could not be loaded.");
+      }
+
+      return response.json();
+    })().catch((error) => {
+      manifestPromise = null;
+      throw error;
+    });
+  }
+
+  return manifestPromise;
 }
 
 async function sha256(buffer) {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  const hash = await crypto.subtle.digest("SHA-256", buffer);
 
-  return Array.from(new Uint8Array(digest))
+  return Array.from(new Uint8Array(hash))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
 
-async function loadManifest() {
-  if (manifest) return manifest;
+async function getSession() {
+  if (!sessionPromise) {
+    sessionPromise = (async () => {
+      const meta = await getManifest();
 
-  const response = await fetch(MANIFEST_URL, {
-    cache: "no-cache"
-  });
+      const response = await fetch(meta.model_url);
 
-  if (!response.ok) {
-    throw new Error("Could not load model manifest.");
+      if (!response.ok) {
+        throw new Error("AI model download failed.");
+      }
+
+      const buffer = await response.arrayBuffer();
+      const actualHash = await sha256(buffer);
+
+      if (actualHash !== meta.sha256.toLowerCase()) {
+        throw new Error("AI model integrity verification failed.");
+      }
+
+      ort.env.wasm.numThreads = 1;
+
+      let lastError;
+
+      for (const provider of ["webgpu", "wasm"]) {
+        try {
+          return await ort.InferenceSession.create(buffer, {
+            executionProviders: [provider],
+            graphOptimizationLevel: "all"
+          });
+        } catch (error) {
+          lastError = error;
+          console.warn(`${provider} unavailable:`, error);
+        }
+      }
+
+      throw lastError || new Error("No inference backend available.");
+    })().catch((error) => {
+      sessionPromise = null;
+      throw error;
+    });
   }
 
-  manifest = await response.json();
-
-  const required = [
-    "modelUrl",
-    "sha256",
-    "bias",
-    "temperature",
-    "threshold",
-    "ttaBand"
-  ];
-
-  for (const key of required) {
-    if (!(key in manifest)) {
-      throw new Error(`Missing manifest field: ${key}`);
-    }
-  }
-
-  return manifest;
+  return sessionPromise;
 }
 
-async function loadModel() {
-  if (session) return session;
+function calibrate(logit, meta) {
+  const config = meta.calibration || {};
+  const temperature = config.temperature || 1;
+  const bias = config.bias || 0;
 
-  const config = await loadManifest();
+  const value = logit / temperature + bias;
 
-  const response = await fetch(config.modelUrl || MODEL_PATH);
-
-  if (!response.ok) {
-    throw new Error("Could not download the AI detection model.");
-  }
-
-  modelBytes = await response.arrayBuffer();
-
-  const actualHash = await sha256(modelBytes);
-
-  if (actualHash.toLowerCase() !== config.sha256.toLowerCase()) {
-    modelBytes = null;
-    throw new Error("Model SHA-256 verification failed.");
-  }
-
-  ort.env.wasm.numThreads = Math.min(
-    4,
-    navigator.hardwareConcurrency || 1
-  );
-
-  ort.env.wasm.simd = true;
-
-  const providers = [];
-
-  if ("gpu" in navigator) {
-    providers.push("webgpu");
-  }
-
-  providers.push("wasm");
-
-  let lastError;
-
-  for (const provider of providers) {
-    try {
-      session = await ort.InferenceSession.create(modelBytes, {
-        executionProviders: [provider],
-        graphOptimizationLevel: "all"
-      });
-
-      return session;
-    } catch (error) {
-      lastError = error;
-      console.warn(`${provider} initialization failed:`, error);
-    }
-  }
-
-  throw lastError || new Error("No supported inference provider.");
-}
-
-function createCanvas(image, crop = false) {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d", {
-    willReadFrequently: true
-  });
-
-  const target = 384;
-
-  let width = image.naturalWidth || image.width;
-  let height = image.naturalHeight || image.height;
-
-  if (!width || !height) {
-    throw new Error("Invalid image dimensions.");
-  }
-
-  const scale = target / Math.min(width, height);
-
-  let resizedWidth = Math.round(width * scale);
-  let resizedHeight = Math.round(height * scale);
-
-  if (crop) {
-    resizedWidth = Math.max(target, resizedWidth);
-    resizedHeight = Math.max(target, resizedHeight);
-  }
-
-  canvas.width = target;
-  canvas.height = target;
-
-  const x = Math.round((resizedWidth - target) / 2);
-  const y = Math.round((resizedHeight - target) / 2);
-
-  const temporary = document.createElement("canvas");
-  temporary.width = resizedWidth;
-  temporary.height = resizedHeight;
-
-  const temporaryContext = temporary.getContext("2d", {
-    willReadFrequently: true
-  });
-
-  temporaryContext.drawImage(
-    image,
-    0,
-    0,
-    resizedWidth,
-    resizedHeight
-  );
-
-  context.drawImage(
-    temporary,
-    x,
-    y,
-    target,
-    target,
-    0,
-    0,
-    target,
-    target
-  );
-
-  return context.getImageData(0, 0, target, target);
-}
-
-function imageToTensor(imageData) {
-  const pixels = imageData.data;
-  const size = 384 * 384;
-
-  const tensorData = new Float32Array(3 * size);
-
-  const mean = [0.485, 0.456, 0.406];
-  const std = [0.229, 0.224, 0.225];
-
-  for (let i = 0; i < size; i++) {
-    const offset = i * 4;
-
-    tensorData[i] =
-      (pixels[offset] / 255 - mean[0]) / std[0];
-
-    tensorData[size + i] =
-      (pixels[offset + 1] / 255 - mean[1]) / std[1];
-
-    tensorData[2 * size + i] =
-      (pixels[offset + 2] / 255 - mean[2]) / std[2];
-  }
-
-  return new ort.Tensor(
-    "float32",
-    tensorData,
-    [1, 3, 384, 384]
-  );
-}
-
-async function predict(imageData) {
-  const model = await loadModel();
-
-  const inputName = model.inputNames[0];
-  const inputTensor = imageToTensor(imageData);
-
-  const outputs = await model.run({
-    [inputName]: inputTensor
-  });
-
-  const output = outputs[model.outputNames[0]];
-  const config = await loadManifest();
-
-  if (!output || !output.data.length) {
-    throw new Error("Model returned an empty result.");
-  }
-
-  const rawLogit = Number(output.data[0]);
-
-  if (!Number.isFinite(rawLogit)) {
-    throw new Error("Model returned an invalid score.");
-  }
-
-  const calibratedLogit =
-    rawLogit / config.temperature + config.bias;
-
-  return {
-    logit: calibratedLogit,
-    score: sigmoid(calibratedLogit)
-  };
+  return 1 / (1 + Math.exp(-value));
 }
 
 async function decodeImage(file) {
-  if (!file || !file.type.startsWith("image/")) {
-    throw new Error("Please select a valid image.");
+  if (!(file instanceof Blob) || !file.type.startsWith("image/")) {
+    throw new Error("Please select a supported image.");
   }
 
   if (file.size > 15 * 1024 * 1024) {
-    throw new Error("Image must be 15 MB or smaller.");
+    throw new Error("Image size must be 15 MB or less.");
   }
 
   const bitmap = await createImageBitmap(file);
 
   try {
-    if (Math.min(bitmap.width, bitmap.height) < 32) {
-      throw new Error("Image is too small to analyze reliably.");
+    const canvas = document.createElement("canvas");
+
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+
+    const context = canvas.getContext("2d", {
+      willReadFrequently: true
+    });
+
+    if (!context) {
+      throw new Error("Image processing is unavailable.");
     }
 
+    context.drawImage(bitmap, 0, 0);
+
+    const image = context.getImageData(
+      0,
+      0,
+      bitmap.width,
+      bitmap.height
+    );
+
     return {
-      bitmap,
+      data: image.data,
       width: bitmap.width,
       height: bitmap.height
     };
-  } catch (error) {
+  } finally {
     bitmap.close();
-    throw error;
   }
 }
 
-export async function analyzeImage(file) {
-  const decoded = await decodeImage(file);
+async function runInference(session, tensor) {
+  const inputName = session.inputNames[0];
 
-  try {
-    const config = await loadManifest();
+  const output = await session.run({
+    [inputName]: tensor
+  });
 
-    const firstView = createCanvas(decoded.bitmap);
-    const firstPrediction = await predict(firstView);
+  const result = output[session.outputNames[0]];
 
-    let finalLogit = firstPrediction.logit;
-    let secondPassUsed = false;
-
-    const low = config.ttaBand[0];
-    const high = config.ttaBand[1];
-
-    if (
-      firstPrediction.score >= low &&
-      firstPrediction.score <= high &&
-      Math.min(decoded.width, decoded.height) >=
-        (config.minSide || 384)
-    ) {
-      const nativeView = createCanvas(decoded.bitmap, true);
-      const secondPrediction = await predict(nativeView);
-
-      finalLogit =
-        (firstPrediction.logit + secondPrediction.logit) / 2;
-
-      secondPassUsed = true;
-    }
-
-    const finalScore = sigmoid(finalLogit);
-
-    if (
-      decoded.width < 32 ||
-      decoded.height < 32
-    ) {
-      return {
-        verdict: "not-analyzed",
-        score: null,
-        reason: "Image dimensions are insufficient."
-      };
-    }
-
-    let verdict = "inconclusive";
-
-    if (finalScore >= config.threshold) {
-      verdict = "ai-signals";
-    } else if (finalScore < config.negativeThreshold) {
-      verdict = "real-signals";
-    }
-
-    return {
-      verdict,
-      score: finalScore,
-      secondPassUsed,
-      dimensions: {
-        width: decoded.width,
-        height: decoded.height
-      },
-      warning:
-        "Model prediction is not proof of image origin."
-    };
-
-  } finally {
-    decoded.bitmap.close();
+  if (!result || !result.data.length) {
+    throw new Error("The model returned no prediction.");
   }
+
+  const logit = Number(result.data[0]);
+
+  if (!Number.isFinite(logit)) {
+    throw new Error("The model returned an invalid prediction.");
+  }
+
+  return logit;
 }
 
 export async function initializeDetector() {
-  await loadManifest();
-  await loadModel();
+  const [meta, session] = await Promise.all([
+    getManifest(),
+    getSession()
+  ]);
 
   return {
     ready: true,
-    providers: session.executionProviders || [],
-    model: manifest.version || "unknown"
+    version: meta.version,
+    inputSize: meta.input_size,
+    providers: session.executionProviders || []
+  };
+}
+
+export async function analyzeImage(file) {
+  const [meta, session] = await Promise.all([
+    getManifest(),
+    getSession()
+  ]);
+
+  const image = await decodeImage(file);
+
+  if (image.width < 32 || image.height < 32) {
+    return {
+      ok: false,
+      reason: "too-small",
+      message: "Image is too small to analyze reliably."
+    };
+  }
+
+  const degenerate = degenerateReason(image);
+
+  if (degenerate) {
+    return {
+      ok: false,
+      reason: `degenerate-${degenerate}`,
+      message: "This image cannot be analyzed reliably."
+    };
+  }
+
+  const quality = degradationStats(image);
+
+  const degraded =
+    quality.block >= 1.8 ||
+    quality.d12 < 0.528;
+
+  const standardTensor = preprocessImage(image, meta);
+
+  const firstLogit = await runInference(
+    session,
+    standardTensor
+  );
+
+  const firstScore = calibrate(firstLogit, meta);
+
+  const tta = meta.tta || {};
+
+  let finalLogit = firstLogit;
+  let secondPassUsed = false;
+
+  const largeImage =
+    Math.min(image.width, image.height) >=
+    (tta.min_side || meta.input_size);
+
+  if (
+    tta.enabled &&
+    firstScore >= tta.band_lo &&
+    firstScore <= tta.band_hi
+  ) {
+    const secondTensor = largeImage
+      ? preprocessNative(image, meta)
+      : preprocessFit(image, meta);
+
+    const secondLogit = await runInference(
+      session,
+      secondTensor
+    );
+
+    finalLogit = (firstLogit + secondLogit) / 2;
+    secondPassUsed = true;
+  }
+
+  const score = calibrate(finalLogit, meta);
+
+  let verdict = "real-signals";
+
+  if (degraded) {
+    verdict = "inconclusive";
+  } else if (score >= 0.65) {
+    verdict = "ai-signals";
+  } else if (score >= 0.25) {
+    verdict = "inconclusive";
+  }
+
+  return {
+    ok: true,
+    verdict,
+    score,
+    degraded,
+    secondPassUsed,
+    dimensions: {
+      width: image.width,
+      height: image.height
+    },
+    quality: {
+      block: Number(quality.block.toFixed(3)),
+      d12: Number(quality.d12.toFixed(4))
+    },
+    warning:
+      "This is an AI-image detection estimate, not proof of image origin."
   };
 }
