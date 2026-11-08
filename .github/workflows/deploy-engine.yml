@@ -1,3 +1,4 @@
+
 name: Build and Deploy I FIND AI
 
 on:
@@ -14,7 +15,6 @@ on:
       - "writing-engine.js"
       - "writing-ui.js"
       - "assets/**"
-      - "ai-engine/**"
       - ".github/workflows/deploy-engine.yml"
       - "manifest.json"
       - "sw.js"
@@ -44,48 +44,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install engine dependencies
-        working-directory: ai-engine
-        run: npm install --no-audit --no-fund
-
-      - name: Build AI engine
-        working-directory: ai-engine
-        run: npm run build
-
       - name: Prepare website
         run: |
           mkdir -p _site
           rsync -av ./ _site/ \
             --exclude='.git' \
             --exclude='.github' \
-            --exclude='ai-engine' \
             --exclude='_site' \
             --exclude='node_modules'
 
-      - name: Add AI engine
-        run: |
-          mkdir -p _site/engine
-          cp -R ai-engine/dist/. _site/engine/
-
-      - name: Verify deployment files
+      - name: Verify website files
         run: |
           echo "Checking main website..."
           test -f _site/index.html
 
-          echo "Checking video engine files..."
+          echo "Checking video engine..."
           test -f _site/video-engine.js
           test -f _site/video-ui.js
 
-          echo "Checking AI engine deployment..."
-          test -f _site/engine/index.html
-
-          echo "All required deployment files found."
-          find _site -maxdepth 3 -type f -print
+          echo "Website files verified successfully."
+          find _site -maxdepth 2 -type f -print
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
