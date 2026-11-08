@@ -19,15 +19,19 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 
-  <!-- Main Website Script -->
+  <!-- Main website -->
   <script src="script.js" defer></script>
 
-  <!-- Video Analysis Engine -->
+  <!-- Image detection -->
+  <script type="module" src="image-engine.js"></script>
+
+  <!-- Video deepfake screening -->
   <script src="video-engine.js" defer></script>
   <script src="video-ui.js" defer></script>
 
-  <!-- Existing Image Analysis Engine -->
-  <script type="module" src="image-engine.js"></script>
+  <!-- AI writing detection -->
+  <script src="writing-engine.js" defer></script>
+  <script src="writing-ui.js" defer></script>
 </head>
 
 <body>
@@ -39,7 +43,6 @@
     <div class="welcome-glow"></div>
 
     <div class="welcome-content">
-
       <div class="welcome-character">
         <img
           src="assets/ifindai-mascot-final.png"
@@ -55,13 +58,11 @@
       </h1>
 
       <p class="welcome-message">Have a good day! ✨</p>
-
     </div>
 
     <div class="welcome-progress">
       <span></span>
     </div>
-
   </div>
 
   <!-- MAIN WEBSITE -->
