@@ -65,6 +65,16 @@ jobs:
           mkdir -p _site/engine
           cp -R ai-engine/dist/. _site/engine/
 
+      - name: Verify deployment files
+        run: |
+          echo "Checking engine deployment files..."
+          test -f _site/engine/index.html
+          echo "Engine HTML found."
+          find _site/engine -maxdepth 3 -type f -print
+          echo "Checking main website..."
+          test -f _site/index.html
+          echo "Main website found."
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
