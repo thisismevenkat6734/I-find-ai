@@ -3,57 +3,45 @@ import {
   analyzeImage
 } from "./detector.js";
 
-const status = document.getElementById("engine-status");
-
 let selectedFile = null;
 let busy = false;
 
 function setStatus(message) {
-  if (status) status.textContent = message;
+  const element = document.getElementById("engine-status");
+  if (element) element.textContent = message;
 }
 
 function createInterface() {
   const main = document.querySelector("main");
 
-  if (!main) {
-    throw new Error("Engine page content is missing.");
-  }
+  if (!main) throw new Error("Engine page content is missing.");
 
   main.innerHTML = `
     <h1>I FIND AI</h1>
     <p>AI Image Detection Engine</p>
 
-    <section>
-      <label for="image-input">Choose an image</label>
-      <input
-        id="image-input"
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-      />
+    <label for="image-input">Choose an image</label>
+    <input id="image-input" type="file"
+      accept="image/jpeg,image/png,image/webp">
 
-      <div id="selected-file" aria-live="polite">
-        No image selected
-      </div>
+    <p id="selected-file">No image selected</p>
 
-      <button id="analyze-button" type="button" disabled>
-        Analyze Image
-      </button>
+    <button id="analyze-button" type="button" disabled>
+      Analyze Image
+    </button>
 
-      <p id="engine-status" role="status" aria-live="polite">
-        Preparing detector...
-      </p>
+    <p id="engine-status" role="status" aria-live="polite">
+      Preparing detector...
+    </p>
 
-      <section id="analysis-result" hidden aria-live="polite">
-        <h2>Analysis Result</h2>
-        <p id="verdict"></p>
-        <p id="confidence"></p>
-        <p id="quality"></p>
-        <p id="second-pass"></p>
-        <p id="dimensions"></p>
-        <p id="warning">
-          AI detection is an estimate, not proof of image origin.
-        </p>
-      </section>
+    <section id="analysis-result" hidden aria-live="polite">
+      <h2>Analysis Result</h2>
+      <p id="verdict"></p>
+      <p id="confidence"></p>
+      <p id="quality"></p>
+      <p id="second-pass"></p>
+      <p id="dimensions"></p>
+      <p>Detection is an estimate, not proof of image origin.</p>
     </section>
   `;
 
@@ -61,7 +49,6 @@ function createInterface() {
     input: document.getElementById("image-input"),
     fileLabel: document.getElementById("selected-file"),
     button: document.getElementById("analyze-button"),
-    status: document.getElementById("engine-status"),
     result: document.getElementById("analysis-result"),
     verdict: document.getElementById("verdict"),
     confidence: document.getElementById("confidence"),
@@ -71,15 +58,15 @@ function createInterface() {
   };
 }
 
-function showResult(elements, result) {
-  elements.result.hidden = false;
+function showResult(ui, result) {
+  ui.result.hidden = false;
 
   if (!result.ok) {
-    elements.verdict.textContent = result.message;
-    elements.confidence.textContent = "";
-    elements.quality.textContent = "";
-    elements.secondPass.textContent = "";
-    elements.dimensions.textContent = "";
+    ui.verdict.textContent = result.message;
+    ui.confidence.textContent = "";
+    ui.quality.textContent = "";
+    ui.secondPass.textContent = "";
+    ui.dimensions.textContent = "";
     return;
   }
 
@@ -89,71 +76,61 @@ function showResult(elements, result) {
     "inconclusive": "Inconclusive result"
   };
 
-  elements.verdict.textContent =
+  ui.verdict.textContent =
     labels[result.verdict] || "Analysis completed";
 
-  elements.confidence.textContent =
+  ui.confidence.textContent =
     `Model score: ${(result.score * 100).toFixed(1)}%`;
 
-  elements.quality.textContent = result.degraded
-    ? "Image quality warning: detection may be unreliable."
+  ui.quality.textContent = result.degraded
+    ? "Image quality warning: result may be unreliable."
     : "No major degradation warning detected.";
 
-  elements.secondPass.textContent =
+  ui.secondPass.textContent =
     `Second analysis pass: ${result.secondPassUsed ? "Yes" : "No"}`;
 
-  elements.dimensions.textContent =
-    `Image size: ${result.dimensions.width} × ${result.dimensions.height}`;
+  ui.dimensions.textContent =
+    `Image dimensions: ${result.dimensions.width} × ${result.dimensions.height}`;
 }
 
 async function start() {
-  let elements;
-
   try {
-    elements = createInterface();
+    const ui = createInterface();
 
-    elements.input.addEventListener("change", () => {
-      const file = elements.input.files?.[0] || null;
+    ui.input.addEventListener("change", () => {
+      selectedFile = ui.input.files?.[0] || null;
+      ui.result.hidden = true;
+      ui.button.disabled = !selectedFile || busy;
 
-      selectedFile = file;
-
-      elements.result.hidden = true;
-      elements.button.disabled = !file || busy;
-
-      elements.fileLabel.textContent = file
-        ? `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`
+      ui.fileLabel.textContent = selectedFile
+        ? `${selectedFile.name} (${(selectedFile.size / 1048576).toFixed(2)} MB)`
         : "No image selected";
     });
 
-    elements.button.addEventListener("click", async () => {
+    ui.button.addEventListener("click", async () => {
       if (!selectedFile || busy) return;
 
       busy = true;
-      elements.button.disabled = true;
-      elements.result.hidden = true;
-
-      setStatus("Analyzing image. Please wait...");
+      ui.button.disabled = true;
+      ui.result.hidden = true;
+      setStatus("Analyzing image...");
 
       try {
         const result = await analyzeImage(selectedFile);
-
-        showResult(elements, result);
-
+        showResult(ui, result);
         setStatus("Analysis completed.");
       } catch (error) {
-        console.error("Image analysis failed:", error);
-        setStatus(error.message || "Image analysis failed.");
+        console.error(error);
+        setStatus(error.message || "Analysis failed.");
       } finally {
         busy = false;
-        elements.button.disabled = !selectedFile;
+        ui.button.disabled = !selectedFile;
       }
     });
 
-    setStatus("Loading AI detection model...");
-
+    setStatus("Loading detection model...");
     await initializeDetector();
-
-    setStatus("AI detection engine is ready.");
+    setStatus("Detection engine is ready.");
 
   } catch (error) {
     console.error("Engine startup failed:", error);
@@ -162,4 +139,3 @@ async function start() {
 }
 
 start();
-
